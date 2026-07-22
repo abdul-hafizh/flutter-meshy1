@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter test *)",
+      "Bash(npm install *)",
+      "Skill(run)",
+      "Skill(run:*)"
+    ]
+  }
+}
