@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../data/dummy_data.dart';
+import '../providers/auth_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/category_tile.dart';
 import '../widgets/product_card.dart';
@@ -12,6 +14,9 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<AuthController>().user;
+    final firstName = (user?.fullName.isNotEmpty ?? false) ? user!.fullName.split(' ').first : 'Creator';
+
     return SafeArea(
       bottom: false,
       child: ListView(
@@ -20,16 +25,16 @@ class HomeScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     'Selamat datang,',
                     style: TextStyle(fontSize: 13.5, color: AppColors.textSecondary),
                   ),
                   Text(
-                    'Creator',
-                    style: TextStyle(
+                    firstName,
+                    style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary,

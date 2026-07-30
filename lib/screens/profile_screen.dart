@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../data/dummy_data.dart';
+import '../providers/auth_controller.dart';
 import '../theme/app_theme.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -11,6 +13,45 @@ class ProfileScreen extends StatelessWidget {
   static const int _diskonPersen = 5;
   static const int _cetakUntukNaik = 28;
   static const int _totalBelanja = 2450000;
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Keluar akun?',
+          style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+        ),
+        content: const Text(
+          'Kamu perlu masuk kembali untuk melanjutkan.',
+          style: TextStyle(fontSize: 13.5, color: AppColors.textSecondary),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Batal', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w700)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE0453A),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Keluar', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      await context.read<AuthController>().logout();
+    }
+  }
 
   String _rupiah(int v) {
     final s = v.toString();
@@ -29,12 +70,36 @@ class ProfileScreen extends StatelessWidget {
     final nextTier = _currentTierIndex + 1 < kLoyaltyTiers.length
         ? kLoyaltyTiers[_currentTierIndex + 1]
         : null;
+    final user = context.watch<AuthController>().user;
 
     return SafeArea(
       bottom: false,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
         children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Profil',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+              ),
+              GestureDetector(
+                onTap: () => _confirmLogout(context),
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0453A).withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFE0453A).withValues(alpha: 0.2)),
+                  ),
+                  child: const Icon(Icons.logout_rounded, color: Color(0xFFE0453A), size: 20),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
           Center(
             child: Column(
               children: [
@@ -68,14 +133,14 @@ class ProfileScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                const Text(
-                  'Creator',
-                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                Text(
+                  user?.fullName ?? 'Creator',
+                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 2),
-                const Text(
-                  'creator@snapy.co.id',
-                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                Text(
+                  user?.email ?? 'creator@snapy.co.id',
+                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 10),
                 Container(

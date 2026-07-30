@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import 'screens/main_shell.dart';
+import 'package:provider/provider.dart';
+
+import 'providers/auth_controller.dart';
+import 'screens/auth/auth_gate.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -11,11 +14,14 @@ class SnapyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Snapy AI 3D',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      home: const MainShell(),
+    return ChangeNotifierProvider(
+      create: (_) => AuthController(),
+      child: MaterialApp(
+        title: 'Snapy AI 3D',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        home: const AuthGate(),
+      ),
     );
   }
 }

@@ -4,7 +4,8 @@
       "Bash(flutter test *)",
       "Bash(npm install *)",
       "Skill(run)",
-      "Skill(run:*)"
+      "Skill(run:*)",
+      "Bash(npm list *)"
     ]
   }
 }
