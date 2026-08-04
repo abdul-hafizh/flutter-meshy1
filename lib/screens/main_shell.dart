@@ -16,16 +16,20 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _index = 0;
+  final _ordersKey = GlobalKey<OrdersScreenState>();
 
-  void _goTo(int i) => setState(() => _index = i);
+  void _goTo(int i) {
+    setState(() => _index = i);
+    if (i == 3) _ordersKey.currentState?.reload();
+  }
 
   @override
   Widget build(BuildContext context) {
     final screens = [
       HomeScreen(onCreateTap: () => _goTo(1)),
-      const CreateScreen(),
+      CreateScreen(onCreated: () => _goTo(3)),
       const MarketScreen(),
-      const OrdersScreen(),
+      OrdersScreen(key: _ordersKey),
       const ProfileScreen(),
     ];
 
