@@ -28,6 +28,10 @@
 	<true/>
 	<key>io.flutter.embedded_views_preview</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Snapy AI 3D butuh akses galeri untuk memilih foto sebagai referensi model 3D.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Snapy AI 3D butuh akses kamera untuk mengambil foto sebagai referensi model 3D.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

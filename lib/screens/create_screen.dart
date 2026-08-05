@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_controller.dart';
@@ -7,6 +10,10 @@ import '../services/auth_service.dart' show ApiException;
 import '../theme/app_theme.dart';
 import '../widgets/category_tile.dart';
 import '../widgets/gradient_button.dart';
+
+enum _CreateMode { text, image }
+
+const _kMaxReferenceImages = 4;
 
 class CreateScreen extends StatefulWidget {
   /// Called after a job is successfully queued, so the shell can jump the
@@ -24,8 +31,12 @@ class _CreateScreenState extends State<CreateScreen> {
   final TextEditingController _negativeController = TextEditingController();
   String _selectedCategory = 'Figurine';
   String _artStyle = 'realistic';
+  _CreateMode _mode = _CreateMode.text;
   bool _hasText = false;
   bool _generating = false;
+
+  final List<XFile> _pickedImages = [];
+  final List<Uint8List> _pickedImageBytesList = [];
 
   static const _categories = ['Figurine', 'Accessories', 'Decoration', 'Gadget case'];
   static const _artStyles = {'realistic': 'Realistic', 'sculpture': 'Sculpture'};
@@ -46,8 +57,31 @@ class _CreateScreenState extends State<CreateScreen> {
     super.dispose();
   }
 
+  bool get _canGenerate =>
+      _mode == _CreateMode.text ? _hasText : _pickedImages.isNotEmpty;
+
+  Future<void> _pickImages() async {
+    final remaining = _kMaxReferenceImages - _pickedImages.length;
+    if (remaining <= 0) return;
+    final files = await ImagePicker().pickMultiImage(imageQuality: 90, limit: remaining);
+    if (files.isEmpty) return;
+    final bytesList = await Future.wait(files.map((f) => f.readAsBytes()));
+    if (!mounted) return;
+    setState(() {
+      _pickedImages.addAll(files);
+      _pickedImageBytesList.addAll(bytesList);
+    });
+  }
+
+  void _removeImageAt(int index) {
+    setState(() {
+      _pickedImages.removeAt(index);
+      _pickedImageBytesList.removeAt(index);
+    });
+  }
+
   Future<void> _generate() async {
-    if (!_hasText || _generating) return;
+    if (!_canGenerate || _generating) return;
 
     final auth = context.read<AuthController>();
     final token = auth.token;
@@ -58,18 +92,38 @@ class _CreateScreenState extends State<CreateScreen> {
       return;
     }
 
-    final prompt = _controller.text.trim();
     setState(() => _generating = true);
     try {
-      await AiJobService.createTextTo3D(
-        token: token,
-        prompt: prompt,
-        artStyle: _artStyle,
-        negativePrompt: _negativeController.text,
-      );
+      if (_mode == _CreateMode.text) {
+        await AiJobService.createTextTo3D(
+          token: token,
+          prompt: _controller.text.trim(),
+          artStyle: _artStyle,
+          negativePrompt: _negativeController.text,
+        );
+      } else {
+        await AiJobService.createImageTo3D(
+          token: token,
+          images: [
+            for (var i = 0; i < _pickedImages.length; i++)
+              ImageUpload(
+                bytes: _pickedImageBytesList[i],
+                filename: _pickedImages[i].name,
+                mimeType: _pickedImages[i].mimeType,
+              ),
+          ],
+          prompt: _controller.text.trim().isEmpty ? null : _controller.text.trim(),
+          artStyle: _artStyle,
+          negativePrompt: _negativeController.text,
+        );
+      }
       if (!mounted) return;
       _controller.clear();
       _negativeController.clear();
+      setState(() {
+        _pickedImages.clear();
+        _pickedImageBytesList.clear();
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Desain 3D sedang diproses AI ✨ Cek progresnya di menu Pesanan.')),
       );
@@ -89,6 +143,7 @@ class _CreateScreenState extends State<CreateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isImageMode = _mode == _CreateMode.image;
     return SafeArea(
       bottom: false,
       child: ListView(
@@ -107,10 +162,53 @@ class _CreateScreenState extends State<CreateScreen> {
             'Deskripsikan produk impianmu, AI yang wujudkan',
             style: TextStyle(fontSize: 13.5, color: AppColors.textSecondary),
           ),
-          const SizedBox(height: 26),
-          const Text(
-            'Deskripsi Produk',
-            style: TextStyle(
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: _ModeTab(
+                  label: 'Teks ke 3D',
+                  selected: _mode == _CreateMode.text,
+                  onTap: () => setState(() => _mode = _CreateMode.text),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _ModeTab(
+                  label: 'Gambar ke 3D',
+                  selected: isImageMode,
+                  onTap: () => setState(() => _mode = _CreateMode.image),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          if (isImageMode) ...[
+            Text(
+              'Foto Referensi (${_pickedImages.length}/$_kMaxReferenceImages)',
+              style: const TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Pakai beberapa foto dari sudut berbeda untuk hasil 3D yang lebih lengkap',
+              style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 10),
+            _ImagesPickerField(
+              imageBytesList: _pickedImageBytesList,
+              canAddMore: _pickedImages.length < _kMaxReferenceImages,
+              onPick: _pickImages,
+              onRemove: _removeImageAt,
+            ),
+            const SizedBox(height: 22),
+          ],
+          Text(
+            isImageMode ? 'Deskripsi Tambahan (opsional)' : 'Deskripsi Produk',
+            style: const TextStyle(
               fontSize: 14.5,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
@@ -128,11 +226,13 @@ class _CreateScreenState extends State<CreateScreen> {
               minLines: 5,
               maxLines: 7,
               style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
-              decoration: const InputDecoration(
-                contentPadding: EdgeInsets.all(16),
+              decoration: InputDecoration(
+                contentPadding: const EdgeInsets.all(16),
                 border: InputBorder.none,
-                hintText: 'Contoh: Miniatur mobil Porsche 911 GT3 warna hitam metalik dengan detail interior...',
-                hintStyle: TextStyle(fontSize: 13.5, color: AppColors.textFaint, height: 1.4),
+                hintText: isImageMode
+                    ? 'Contoh: half body dengan wajah jelas...'
+                    : 'Contoh: Miniatur mobil Porsche 911 GT3 warna hitam metalik dengan detail interior...',
+                hintStyle: const TextStyle(fontSize: 13.5, color: AppColors.textFaint, height: 1.4),
               ),
             ),
           ),
@@ -212,10 +312,123 @@ class _CreateScreenState extends State<CreateScreen> {
           const SizedBox(height: 32),
           GradientButton(
             label: _generating ? 'Membuat desain...' : 'Buat dengan AI ✨',
-            onPressed: _hasText && !_generating ? _generate : null,
+            onPressed: _canGenerate && !_generating ? _generate : null,
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ModeTab extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ModeTab({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            gradient: selected ? AppColors.brandGradient : null,
+            color: selected ? null : AppColors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: selected ? Colors.transparent : AppColors.border),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+              color: selected ? Colors.white : AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ImagesPickerField extends StatelessWidget {
+  final List<Uint8List> imageBytesList;
+  final bool canAddMore;
+  final VoidCallback onPick;
+  final ValueChanged<int> onRemove;
+
+  const _ImagesPickerField({
+    required this.imageBytesList,
+    required this.canAddMore,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  static const _tileSize = 86.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        for (var i = 0; i < imageBytesList.length; i++)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: SizedBox(
+              width: _tileSize,
+              height: _tileSize,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.memory(imageBytesList[i], fit: BoxFit.cover),
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: Material(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () => onRemove(i),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Icon(Icons.close_rounded, size: 14, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        if (canAddMore)
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: onPick,
+              child: Container(
+                width: _tileSize,
+                height: _tileSize,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: const Icon(Icons.add_photo_alternate_outlined, size: 26, color: AppColors.textFaint),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
