@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -10,10 +11,15 @@ import '../services/auth_service.dart' show ApiException;
 import '../theme/app_theme.dart';
 import '../widgets/category_tile.dart';
 import '../widgets/gradient_button.dart';
+import '../widgets/token_balance_badge.dart';
+import 'buy_tokens_screen.dart';
 
 enum _CreateMode { text, image }
 
 const _kMaxReferenceImages = 4;
+
+/// Must match the backend's GENERATION_COST in ai.controller.js.
+const _kGenerationCost = 40;
 
 class CreateScreen extends StatefulWidget {
   /// Called after a job is successfully queued, so the shell can jump the
@@ -92,6 +98,22 @@ class _CreateScreenState extends State<CreateScreen> {
       return;
     }
 
+    final credits = auth.user?.credits ?? 0;
+    if (credits < _kGenerationCost) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Token tidak cukup. Butuh $_kGenerationCost token, kamu punya $credits.'),
+          action: SnackBarAction(
+            label: 'Beli Token',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const BuyTokensScreen()),
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
     setState(() => _generating = true);
     try {
       if (_mode == _CreateMode.text) {
@@ -127,6 +149,7 @@ class _CreateScreenState extends State<CreateScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Desain 3D sedang diproses AI ✨ Cek progresnya di menu Pesanan.')),
       );
+      unawaited(auth.refreshUser());
       widget.onCreated?.call();
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -144,18 +167,32 @@ class _CreateScreenState extends State<CreateScreen> {
   @override
   Widget build(BuildContext context) {
     final isImageMode = _mode == _CreateMode.image;
+    final credits = context.watch<AuthController>().user?.credits ?? 0;
     return SafeArea(
       bottom: false,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
         children: [
-          const Text(
-            'Buat Produk 3D',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Expanded(
+                child: Text(
+                  'Buat Produk 3D',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              TokenBalanceBadge(
+                credits: credits,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const BuyTokensScreen()),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 4),
           const Text(

@@ -1,10 +1,16 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_controller.dart';
+import '../../services/google_auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_text_field.dart';
-import '../../widgets/google_auth_button.dart';
+import '../../widgets/google_sign_in_entry.dart';
+import '../../widgets/google_web_button.dart';
 import '../../widgets/gradient_button.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -22,6 +28,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   String? _errorMessage;
+  StreamSubscription<GoogleSignInAuthenticationEvent>? _googleEventsSub;
+
+  @override
+  void initState() {
+    super.initState();
+    // Web can't trigger Google sign-in from our own button, so the result
+    // of Google's own rendered button arrives through this stream instead.
+    if (kIsWeb) {
+      _googleEventsSub = GoogleAuthService.authenticationEvents.listen(_handleWebGoogleEvent);
+    }
+  }
 
   @override
   void dispose() {
@@ -30,6 +47,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _googleEventsSub?.cancel();
     super.dispose();
   }
 
@@ -57,10 +75,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
     Navigator.of(context).pop();
   }
 
-  void _googleComingSoon() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Daftar dengan Google akan segera hadir')),
-    );
+  Future<void> _handleGoogle() async {
+    final auth = context.read<AuthController>();
+    if (auth.isSubmitting) return;
+    setState(() => _errorMessage = null);
+    final error = await auth.loginWithGoogle();
+    _afterGoogleLogin(auth, error);
+  }
+
+  Future<void> _handleWebGoogleEvent(GoogleSignInAuthenticationEvent event) async {
+    if (event is! GoogleSignInAuthenticationEventSignIn) return;
+    final idToken = event.user.authentication.idToken;
+    if (idToken == null) return;
+
+    final auth = context.read<AuthController>();
+    setState(() => _errorMessage = null);
+    final error = await auth.loginWithGoogleIdToken(idToken);
+    _afterGoogleLogin(auth, error);
+  }
+
+  void _afterGoogleLogin(AuthController auth, String? error) {
+    if (!mounted) return;
+    if (error != null) {
+      setState(() => _errorMessage = error);
+      return;
+    }
+    // Google sign-in (unlike email/password register) logs the user in
+    // immediately, so pop back to let AuthGate swap in the main app.
+    if (auth.status == AuthStatus.authenticated) {
+      Navigator.of(context).pop();
+    }
   }
 
   @override
@@ -191,7 +235,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                GoogleAuthButton(label: 'Daftar dengan Google', onPressed: _googleComingSoon),
+                GoogleSignInEntry(
+                  label: 'Daftar dengan Google',
+                  webText: GoogleWebButtonText.signUp,
+                  onPressed: _handleGoogle,
+                ),
                 const SizedBox(height: 28),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,

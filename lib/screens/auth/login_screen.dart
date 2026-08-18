@@ -1,10 +1,16 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_controller.dart';
+import '../../services/google_auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_text_field.dart';
-import '../../widgets/google_auth_button.dart';
+import '../../widgets/google_sign_in_entry.dart';
+import '../../widgets/google_web_button.dart';
 import '../../widgets/gradient_button.dart';
 import 'register_screen.dart';
 
@@ -20,12 +26,38 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   String? _errorMessage;
+  StreamSubscription<GoogleSignInAuthenticationEvent>? _googleEventsSub;
+
+  @override
+  void initState() {
+    super.initState();
+    // Web can't trigger Google sign-in from our own button, so the result
+    // of Google's own rendered button arrives through this stream instead.
+    if (kIsWeb) {
+      _googleEventsSub = GoogleAuthService.authenticationEvents.listen(_handleWebGoogleEvent);
+    }
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _googleEventsSub?.cancel();
     super.dispose();
+  }
+
+  Future<void> _handleWebGoogleEvent(GoogleSignInAuthenticationEvent event) async {
+    if (event is! GoogleSignInAuthenticationEventSignIn) return;
+    final idToken = event.user.authentication.idToken;
+    if (idToken == null) return;
+
+    final auth = context.read<AuthController>();
+    setState(() => _errorMessage = null);
+    final error = await auth.loginWithGoogleIdToken(idToken);
+    if (!mounted) return;
+    if (error != null) {
+      setState(() => _errorMessage = error);
+    }
   }
 
   Future<void> _submit() async {
@@ -49,10 +81,15 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _googleComingSoon() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Masuk dengan Google akan segera hadir')),
-    );
+  Future<void> _handleGoogle() async {
+    final auth = context.read<AuthController>();
+    if (auth.isSubmitting) return;
+    setState(() => _errorMessage = null);
+    final error = await auth.loginWithGoogle();
+    if (!mounted) return;
+    if (error != null) {
+      setState(() => _errorMessage = error);
+    }
   }
 
   @override
@@ -148,7 +185,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                GoogleAuthButton(label: 'Masuk dengan Google', onPressed: _googleComingSoon),
+                GoogleSignInEntry(
+                  label: 'Masuk dengan Google',
+                  webText: GoogleWebButtonText.signIn,
+                  onPressed: _handleGoogle,
+                ),
                 const SizedBox(height: 28),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,

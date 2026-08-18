@@ -5,6 +5,7 @@ class AppUser {
   final String phone;
   final int roleId;
   final String? role;
+  final int credits;
 
   const AppUser({
     required this.id,
@@ -13,6 +14,7 @@ class AppUser {
     required this.phone,
     required this.roleId,
     this.role,
+    this.credits = 0,
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json) {
@@ -24,7 +26,10 @@ class AppUser {
       roleId: json['RoleId'] is int
           ? json['RoleId'] as int
           : int.tryParse('${json['RoleId']}') ?? 0,
-      role: json['Role']?.toString(),
+      role: json['Role'] is String ? json['Role'] as String : (json['Role'] as Map<String, dynamic>?)?['Name']?.toString(),
+      credits: json['AICredits'] is int
+          ? json['AICredits'] as int
+          : int.tryParse('${json['AICredits']}') ?? 0,
     );
   }
 
@@ -35,5 +40,6 @@ class AppUser {
         'Phone': phone,
         'RoleId': roleId,
         'Role': role,
+        'AICredits': credits,
       };
 }

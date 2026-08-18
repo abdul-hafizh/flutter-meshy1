@@ -6,6 +6,8 @@ import '../theme/app_theme.dart';
 import '../widgets/category_tile.dart';
 import '../widgets/product_card.dart';
 import '../widgets/section_header.dart';
+import '../widgets/token_balance_badge.dart';
+import 'buy_tokens_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final VoidCallback onCreateTap;
@@ -42,18 +44,29 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              Container(
-                width: 42,
-                height: 42,
-                decoration: const BoxDecoration(
-                  gradient: AppColors.brandGradient,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.notifications_none_rounded,
-                  color: Colors.white,
-                  size: 22,
-                ),
+              Row(
+                children: [
+                  TokenBalanceBadge(
+                    credits: user?.credits ?? 0,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const BuyTokensScreen()),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: const BoxDecoration(
+                      gradient: AppColors.brandGradient,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.notifications_none_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
