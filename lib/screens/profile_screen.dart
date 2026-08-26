@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/dummy_data.dart';
 import '../providers/auth_controller.dart';
+import '../providers/chat_controller.dart';
 import '../theme/app_theme.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -49,6 +50,8 @@ class ProfileScreen extends StatelessWidget {
     );
 
     if (confirmed == true && context.mounted) {
+      await context.read<ChatController>().disconnect();
+      if (!context.mounted) return;
       await context.read<AuthController>().logout();
     }
   }

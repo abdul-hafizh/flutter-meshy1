@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -26,10 +28,22 @@ class OrdersScreenState extends State<OrdersScreen> {
   String? _selectedJobId;
   String? _selectedPrompt;
 
+  // Polls Meshy for progress on any still-processing job so the list updates
+  // on its own — no more manually tapping refresh. Only ever scheduled while
+  // at least one job is unfinished, and stops itself once everything's done.
+  Timer? _pollTimer;
+  static const _pollInterval = Duration(seconds: 5);
+
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
   }
 
   /// Refetches the job list from the server. Called by [MainShell] whenever
@@ -51,7 +65,45 @@ class OrdersScreenState extends State<OrdersScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
+    } finally {
+      _scheduleNextPoll();
     }
+  }
+
+  /// Same as [_load] but without the full-screen loading spinner — used for
+  /// background polling so the list doesn't flicker every few seconds.
+  Future<void> _loadQuiet() async {
+    final token = context.read<AuthController>().token;
+    if (token == null) return;
+    try {
+      final jobs = await AiJobService.listMyJobs(token: token);
+      if (!mounted) return;
+      setState(() => _jobs = jobs);
+    } catch (_) {
+      // Best-effort — keep the previous list and try again next tick.
+    }
+  }
+
+  void _scheduleNextPoll() {
+    _pollTimer?.cancel();
+    if (!_jobs.any((j) => !j.status.isJobFinished)) return;
+    _pollTimer = Timer(_pollInterval, _pollActiveJobs);
+  }
+
+  Future<void> _pollActiveJobs() async {
+    final token = context.read<AuthController>().token;
+    if (token == null) return;
+    final activeJobIds = _jobs.where((j) => !j.status.isJobFinished).map((j) => j.id).toList();
+    for (final jobId in activeJobIds) {
+      try {
+        await AiJobService.syncJobStatus(token: token, jobId: jobId);
+      } catch (_) {
+        // Best-effort — a stale status for one job shouldn't stop the rest.
+      }
+    }
+    if (!mounted) return;
+    await _loadQuiet();
+    _scheduleNextPoll();
   }
 
   Future<void> _sync(AiJobSummary job) async {

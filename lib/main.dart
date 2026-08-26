@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'providers/auth_controller.dart';
+import 'providers/chat_controller.dart';
 import 'screens/auth/auth_gate.dart';
 import 'theme/app_theme.dart';
 
@@ -14,8 +15,11 @@ class SnapyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AuthController(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthController()),
+        ChangeNotifierProvider(create: (_) => ChatController()),
+      ],
       child: MaterialApp(
         title: 'Snapy AI 3D',
         debugShowCheckedModeBanner: false,

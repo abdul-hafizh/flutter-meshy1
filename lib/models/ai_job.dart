@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../services/api_config.dart';
 
-/// Status values returned by the Meshy-backed AI job API.
 class AiJobStatus {
   static const pending = 'PENDING';
   static const inProgress = 'IN_PROGRESS';

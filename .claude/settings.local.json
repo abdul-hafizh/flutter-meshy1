@@ -6,7 +6,9 @@
       "Skill(run)",
       "Skill(run:*)",
       "Bash(npm list *)",
-      "Bash(php artisan tinker '--execute= *)"
+      "Bash(php artisan tinker '--execute= *)",
+      "Bash(flutter analyze *)",
+      "WebSearch"
     ]
   }
 }
