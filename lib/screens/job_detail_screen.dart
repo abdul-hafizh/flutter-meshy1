@@ -310,6 +310,11 @@ class _JobDetailViewState extends State<JobDetailView> {
                                   color: AppColors.textPrimary,
                                 ),
                               ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Setelah chat dengan penjual, pantau pesananmu di tab Pesanan Fisik.',
+                                style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                              ),
                               const SizedBox(height: 10),
                               if (_merchantsLoading)
                                 const Padding(

@@ -8,7 +8,12 @@
       "Bash(npm list *)",
       "Bash(php artisan tinker '--execute= *)",
       "Bash(flutter analyze *)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(node -e ' *)",
+      "Bash(curl -s http://localhost:3000/api/health)",
+      "Read(//tmp/**)",
+      "WebFetch(domain:biteship.com)",
+      "Bash(curl -v --max-time 10 https://api.biteship.com/v1/couriers)"
     ]
   }
 }

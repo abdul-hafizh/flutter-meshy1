@@ -4,11 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/ai_job.dart';
+import '../models/physical_order.dart';
 import '../providers/auth_controller.dart';
 import '../services/ai_job_service.dart';
 import '../services/auth_service.dart' show ApiException;
+import '../services/order_service.dart';
 import '../theme/app_theme.dart';
 import 'job_detail_screen.dart';
+import 'orders/order_detail_screen.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -18,6 +21,11 @@ class OrdersScreen extends StatefulWidget {
 }
 
 class OrdersScreenState extends State<OrdersScreen> {
+  // 'ai' = AI-generation job history (existing), 'physical' = real 3D-print
+  // orders placed with a merchant (new). Kept as two sub-tabs of the same
+  // bottom-nav "Pesanan" slot rather than a separate nav item.
+  String _mainTab = 'ai';
+
   String _activeTab = 'Semua';
   static const _tabs = ['Semua', 'Aktif', 'Selesai'];
 
@@ -27,6 +35,11 @@ class OrdersScreenState extends State<OrdersScreen> {
 
   String? _selectedJobId;
   String? _selectedPrompt;
+
+  bool _ordersLoading = true;
+  bool _ordersLoadedOnce = false;
+  List<PhysicalOrder> _physicalOrders = [];
+  String? _selectedOrderId;
 
   // Polls Meshy for progress on any still-processing job so the list updates
   // on its own — no more manually tapping refresh. Only ever scheduled while
@@ -49,7 +62,31 @@ class OrdersScreenState extends State<OrdersScreen> {
   /// Refetches the job list from the server. Called by [MainShell] whenever
   /// the Pesanan tab becomes visible, since IndexedStack keeps this screen
   /// alive instead of rebuilding it.
-  Future<void> reload() => _load();
+  Future<void> reload() {
+    if (_mainTab == 'physical') return _loadOrders();
+    return _load();
+  }
+
+  Future<void> _loadOrders() async {
+    final token = context.read<AuthController>().token;
+    if (token == null) return;
+    setState(() => _ordersLoading = true);
+    try {
+      final orders = await OrderService.listMine(token: token);
+      if (!mounted) return;
+      setState(() => _physicalOrders = orders);
+    } catch (_) {
+      // Best-effort — keep whatever list was already showing.
+    } finally {
+      if (mounted) setState(() => _ordersLoading = false);
+      _ordersLoadedOnce = true;
+    }
+  }
+
+  void _selectMainTab(String tab) {
+    setState(() => _mainTab = tab);
+    if (tab == 'physical' && !_ordersLoadedOnce) _loadOrders();
+  }
 
   Future<void> _load() async {
     final token = context.read<AuthController>().token;
@@ -141,7 +178,7 @@ class OrdersScreenState extends State<OrdersScreen> {
   @override
   Widget build(BuildContext context) {
     final selectedJobId = _selectedJobId;
-    if (selectedJobId != null) {
+    if (_mainTab == 'ai' && selectedJobId != null) {
       return SafeArea(
         bottom: false,
         child: JobDetailView(
@@ -155,11 +192,22 @@ class OrdersScreenState extends State<OrdersScreen> {
       );
     }
 
+    final selectedOrderId = _selectedOrderId;
+    if (_mainTab == 'physical' && selectedOrderId != null) {
+      return SafeArea(
+        bottom: false,
+        child: OrderDetailView(
+          orderId: selectedOrderId,
+          onBack: () => setState(() => _selectedOrderId = null),
+        ),
+      );
+    }
+
     final filtered = _filtered;
     return SafeArea(
       bottom: false,
       child: RefreshIndicator(
-        onRefresh: _load,
+        onRefresh: reload,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           children: [
@@ -173,45 +221,256 @@ class OrdersScreenState extends State<OrdersScreen> {
             ),
             const SizedBox(height: 4),
             const Text(
-              'Lacak status pesanan 3D printing kamu',
+              'Lacak desain AI dan pesanan cetak 3D kamu',
               style: TextStyle(fontSize: 13.5, color: AppColors.textSecondary),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
             Row(
               children: [
-                for (final t in _tabs) ...[
-                  _OrderTab(
-                    label: t,
-                    active: _activeTab == t,
-                    onTap: () => setState(() => _activeTab = t),
-                  ),
-                  const SizedBox(width: 10),
-                ],
+                _MainTab(label: 'Desain AI', active: _mainTab == 'ai', onTap: () => _selectMainTab('ai')),
+                const SizedBox(width: 10),
+                _MainTab(label: 'Pesanan Fisik', active: _mainTab == 'physical', onTap: () => _selectMainTab('physical')),
               ],
             ),
             const SizedBox(height: 18),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.only(top: 40),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (filtered.isEmpty)
-              const _EmptyState()
-            else
-              for (final job in filtered) ...[
-                _OrderCard(
-                  job: job,
-                  syncing: _syncingIds.contains(job.id),
-                  onSync: () => _sync(job),
-                  onTap: () => setState(() {
-                    _selectedJobId = job.id;
-                    _selectedPrompt = job.prompt;
-                  }),
-                ),
-                if (job != filtered.last) const SizedBox(height: 12),
-              ],
+            if (_mainTab == 'ai') ...[
+              Row(
+                children: [
+                  for (final t in _tabs) ...[
+                    _OrderTab(
+                      label: t,
+                      active: _activeTab == t,
+                      onTap: () => setState(() => _activeTab = t),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 18),
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.only(top: 40),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (filtered.isEmpty)
+                const _EmptyState()
+              else
+                for (final job in filtered) ...[
+                  _OrderCard(
+                    job: job,
+                    syncing: _syncingIds.contains(job.id),
+                    onSync: () => _sync(job),
+                    onTap: () => setState(() {
+                      _selectedJobId = job.id;
+                      _selectedPrompt = job.prompt;
+                    }),
+                  ),
+                  if (job != filtered.last) const SizedBox(height: 12),
+                ],
+            ] else ...[
+              if (_ordersLoading)
+                const Padding(
+                  padding: EdgeInsets.only(top: 40),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_physicalOrders.isEmpty)
+                const _PhysicalEmptyState()
+              else
+                for (final order in _physicalOrders) ...[
+                  _PhysicalOrderCard(
+                    order: order,
+                    onTap: () => setState(() => _selectedOrderId = order.id),
+                  ),
+                  if (order != _physicalOrders.last) const SizedBox(height: 12),
+                ],
+            ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _MainTab extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _MainTab({required this.label, required this.active, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 11),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              gradient: active ? AppColors.brandGradient : null,
+              color: active ? null : AppColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: active ? Colors.white : AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PhysicalEmptyState extends StatelessWidget {
+  const _PhysicalEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 48),
+      child: Column(
+        children: [
+          Icon(Icons.local_shipping_outlined, size: 44, color: AppColors.textFaint),
+          const SizedBox(height: 12),
+          const Text(
+            'Belum ada pesanan fisik',
+            style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Pilih penjual dari desain 3D kamu untuk mulai memesan',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PhysicalOrderCard extends StatelessWidget {
+  final PhysicalOrder order;
+  final VoidCallback onTap;
+
+  const _PhysicalOrderCard({required this.order, required this.onTap});
+
+  String _formatDate(DateTime? dt) {
+    if (dt == null) return '';
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    return '${dt.day.toString().padLeft(2, '0')} ${months[dt.month - 1]} ${dt.year}';
+  }
+
+  String _rupiah(int v) {
+    final s = v.toString();
+    final buf = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      final posFromEnd = s.length - i;
+      buf.write(s[i]);
+      if (posFromEnd > 1 && posFromEnd % 3 == 1) buf.write('.');
+    }
+    return 'Rp $buf';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = order.status;
+    final previewUrl = order.primaryItem?.aiModel?.previewUrl;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: previewUrl != null
+                    ? Image.network(
+                        previewUrl,
+                        width: 46,
+                        height: 46,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const _PhysicalThumbFallback(),
+                      )
+                    : const _PhysicalThumbFallback(),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            order.orderNumber ?? 'Pesanan',
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                          ),
+                        ),
+                        if (status != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.purple.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              status.name,
+                              style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.purple),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(_formatDate(order.createdAt), style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    const SizedBox(height: 4),
+                    Text(
+                      order.isPriced ? _rupiah(order.totalAmount!) : 'Menunggu konfirmasi harga',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: order.isPriced ? AppColors.textPrimary : AppColors.orange,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PhysicalThumbFallback extends StatelessWidget {
+  const _PhysicalThumbFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 46,
+      height: 46,
+      decoration: const BoxDecoration(gradient: AppColors.brandGradientSoft),
+      child: ShaderMask(
+        shaderCallback: (rect) => AppColors.brandGradient.createShader(rect),
+        child: const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 22),
       ),
     );
   }
