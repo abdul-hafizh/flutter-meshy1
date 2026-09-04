@@ -3,15 +3,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/app_user.dart';
+import 'api_client.dart';
 import 'api_config.dart';
 
-class ApiException implements Exception {
-  final String message;
-  ApiException(this.message);
-
-  @override
-  String toString() => message;
-}
+export 'api_client.dart' show ApiException;
 
 class AuthResult {
   final String token;
@@ -51,17 +46,11 @@ class AuthService {
       throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
     }
 
-    Map<String, dynamic> decoded;
     try {
-      decoded = jsonDecode(res.body) as Map<String, dynamic>;
-    } catch (_) {
-      throw ApiException('Respon server tidak valid.');
+      return decodeApiResponse(res);
+    } on ApiException catch (e) {
+      throw ApiException(_friendlyMessage(e.message));
     }
-
-    if (res.statusCode >= 200 && res.statusCode < 300 && decoded['success'] == true) {
-      return decoded;
-    }
-    throw ApiException(_friendlyMessage(decoded['message']?.toString() ?? 'Terjadi kesalahan, coba lagi.'));
   }
 
   static Future<AuthResult> login({required String email, required String password}) async {
@@ -117,16 +106,11 @@ class AuthService {
       throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
     }
 
-    Map<String, dynamic> decoded;
     try {
-      decoded = jsonDecode(res.body) as Map<String, dynamic>;
-    } catch (_) {
-      throw ApiException('Respon server tidak valid.');
-    }
-
-    if (res.statusCode >= 200 && res.statusCode < 300 && decoded['success'] == true) {
+      final decoded = decodeApiResponse(res);
       return AppUser.fromJson(decoded['data'] as Map<String, dynamic>);
+    } on ApiException catch (e) {
+      throw ApiException(_friendlyMessage(e.message));
     }
-    throw ApiException(_friendlyMessage(decoded['message']?.toString() ?? 'Terjadi kesalahan, coba lagi.'));
   }
 }

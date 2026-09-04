@@ -1,10 +1,8 @@
-import 'dart:convert';
-
 import 'package:http/http.dart' as http;
 
 import '../models/payment_method.dart';
+import 'api_client.dart';
 import 'api_config.dart';
-import 'auth_service.dart' show ApiException;
 
 class PaymentMethodService {
   PaymentMethodService._();
@@ -16,19 +14,6 @@ class PaymentMethodService {
         'Authorization': 'Bearer $token',
       };
 
-  static Map<String, dynamic> _decode(http.Response res) {
-    Map<String, dynamic> decoded;
-    try {
-      decoded = jsonDecode(res.body) as Map<String, dynamic>;
-    } catch (_) {
-      throw ApiException('Respon server tidak valid.');
-    }
-    if (res.statusCode >= 200 && res.statusCode < 300 && decoded['success'] == true) {
-      return decoded;
-    }
-    throw ApiException(decoded['message']?.toString() ?? 'Terjadi kesalahan, coba lagi.');
-  }
-
   /// Only `Provider == 'Midtrans'` methods are returned — the "Manual
   /// Transfer" rows have no proof-of-payment/verification flow implemented
   /// anywhere in the backend, so surfacing them would be a dead end.
@@ -39,7 +24,7 @@ class PaymentMethodService {
     } catch (_) {
       throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
     }
-    final decoded = _decode(res);
+    final decoded = decodeApiResponse(res);
     final list = decoded['data'] as List<dynamic>? ?? [];
     return list
         .map((e) => PaymentMethodOption.fromJson(e as Map<String, dynamic>))

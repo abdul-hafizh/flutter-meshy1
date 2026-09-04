@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/merchant.dart';
+import 'api_client.dart';
 import 'api_config.dart';
-import 'auth_service.dart' show ApiException;
 
 class StreamTokenResult {
   final String apiKey;
@@ -61,19 +61,6 @@ class ChatService {
         'Authorization': 'Bearer $token',
       };
 
-  static Map<String, dynamic> _decode(http.Response res) {
-    Map<String, dynamic> decoded;
-    try {
-      decoded = jsonDecode(res.body) as Map<String, dynamic>;
-    } catch (_) {
-      throw ApiException('Respon server tidak valid.');
-    }
-    if (res.statusCode >= 200 && res.statusCode < 300 && decoded['success'] == true) {
-      return decoded;
-    }
-    throw ApiException(decoded['message']?.toString() ?? 'Terjadi kesalahan, coba lagi.');
-  }
-
   static Future<StreamTokenResult> fetchToken({required String token}) async {
     http.Response res;
     try {
@@ -84,7 +71,7 @@ class ChatService {
       throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
     }
 
-    final decoded = _decode(res);
+    final decoded = decodeApiResponse(res);
     return StreamTokenResult.fromJson(decoded['data'] as Map<String, dynamic>);
   }
 
@@ -98,7 +85,7 @@ class ChatService {
       throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
     }
 
-    final decoded = _decode(res);
+    final decoded = decodeApiResponse(res);
     final list = decoded['data'] as List<dynamic>? ?? [];
     return list.map((e) => Merchant.fromJson(e as Map<String, dynamic>)).toList();
   }
@@ -128,7 +115,7 @@ class ChatService {
       throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
     }
 
-    final decoded = _decode(res);
+    final decoded = decodeApiResponse(res);
     return ChatChannelInfo.fromJson(decoded['data'] as Map<String, dynamic>);
   }
 }

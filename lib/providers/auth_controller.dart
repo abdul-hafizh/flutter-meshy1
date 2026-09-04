@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../models/app_user.dart';
+import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/google_auth_service.dart';
 import '../services/session_store.dart';
@@ -8,10 +11,22 @@ import '../services/session_store.dart';
 enum AuthStatus { unknown, authenticated, unauthenticated }
 
 class AuthController extends ChangeNotifier {
+  AuthController() {
+    // Services have no BuildContext to reach this controller, so they
+    // report an expired/invalid JWT (HTTP 401) through this global hook
+    // instead — see ApiClient.decodeApiResponse.
+    SessionExpiry.register(_handleSessionExpired);
+  }
+
   AuthStatus status = AuthStatus.unknown;
   AppUser? user;
   String? token;
   bool isSubmitting = false;
+
+  void _handleSessionExpired() {
+    if (status != AuthStatus.authenticated) return;
+    unawaited(logout());
+  }
 
   Future<void> bootstrap() async {
     final storedToken = await SessionStore.readToken();

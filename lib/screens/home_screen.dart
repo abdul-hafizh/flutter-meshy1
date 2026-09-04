@@ -8,6 +8,7 @@ import '../widgets/product_card.dart';
 import '../widgets/section_header.dart';
 import '../widgets/token_balance_badge.dart';
 import 'buy_tokens_screen.dart';
+import 'chat/chat_list_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final VoidCallback onCreateTap;
@@ -50,6 +51,25 @@ class HomeScreen extends StatelessWidget {
                     credits: user?.credits ?? 0,
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const BuyTokensScreen()),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ChatListScreen()),
+                    ),
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: const BoxDecoration(
+                        gradient: AppColors.brandGradient,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.chat_bubble_outline_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),

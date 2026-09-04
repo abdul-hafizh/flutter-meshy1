@@ -1,10 +1,8 @@
-import 'dart:convert';
-
 import 'package:http/http.dart' as http;
 
 import '../models/tracking_event.dart';
+import 'api_client.dart';
 import 'api_config.dart';
-import 'auth_service.dart' show ApiException;
 
 class ShipmentTrackingResult {
   final String status;
@@ -25,19 +23,6 @@ class ShipmentTrackingService {
         'Authorization': 'Bearer $token',
       };
 
-  static Map<String, dynamic> _decode(http.Response res) {
-    Map<String, dynamic> decoded;
-    try {
-      decoded = jsonDecode(res.body) as Map<String, dynamic>;
-    } catch (_) {
-      throw ApiException('Respon server tidak valid.');
-    }
-    if (res.statusCode >= 200 && res.statusCode < 300 && decoded['success'] == true) {
-      return decoded;
-    }
-    throw ApiException(decoded['message']?.toString() ?? 'Gagal memuat tracking, coba lagi.');
-  }
-
   static Future<ShipmentTrackingResult> track({required String token, required String shipmentId}) async {
     http.Response res;
     try {
@@ -45,7 +30,7 @@ class ShipmentTrackingService {
     } catch (_) {
       throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
     }
-    final decoded = _decode(res);
+    final decoded = decodeApiResponse(res, fallbackMessage: 'Gagal memuat tracking, coba lagi.');
     final data = decoded['data'] as Map<String, dynamic>;
     final history = (data['history'] as List<dynamic>? ?? []).map((e) => TrackingEvent.fromJson(e as Map<String, dynamic>)).toList();
     return ShipmentTrackingResult(status: data['status']?.toString() ?? 'PENDING', history: history);

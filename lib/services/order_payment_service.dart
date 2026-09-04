@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'api_client.dart';
 import 'api_config.dart';
-import 'auth_service.dart' show ApiException;
 
 class OrderPaymentResult {
   final String paymentId;
@@ -35,19 +35,6 @@ class OrderPaymentService {
         'Authorization': 'Bearer $token',
       };
 
-  static Map<String, dynamic> _decode(http.Response res) {
-    Map<String, dynamic> decoded;
-    try {
-      decoded = jsonDecode(res.body) as Map<String, dynamic>;
-    } catch (_) {
-      throw ApiException('Respon server tidak valid.');
-    }
-    if (res.statusCode >= 200 && res.statusCode < 300 && decoded['success'] == true) {
-      return decoded;
-    }
-    throw ApiException(decoded['message']?.toString() ?? 'Terjadi kesalahan, coba lagi.');
-  }
-
   static Future<OrderPaymentResult> createSnapToken({
     required String token,
     required String orderId,
@@ -68,7 +55,7 @@ class OrderPaymentService {
     } catch (_) {
       throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
     }
-    final decoded = _decode(res);
+    final decoded = decodeApiResponse(res);
     final data = decoded['data'] as Map<String, dynamic>;
     return OrderPaymentResult(
       paymentId: data['paymentId']?.toString() ?? '',

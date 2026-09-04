@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/physical_order.dart';
+import 'api_client.dart';
 import 'api_config.dart';
-import 'auth_service.dart' show ApiException;
 
 /// Physical 3D-print orders (`/api/orders`) — distinct from AI-generation
 /// jobs (`AiJobService`). The backend already scopes `GET /orders` to the
@@ -19,19 +19,6 @@ class OrderService {
         'Authorization': 'Bearer $token',
       };
 
-  static Map<String, dynamic> _decode(http.Response res) {
-    Map<String, dynamic> decoded;
-    try {
-      decoded = jsonDecode(res.body) as Map<String, dynamic>;
-    } catch (_) {
-      throw ApiException('Respon server tidak valid.');
-    }
-    if (res.statusCode >= 200 && res.statusCode < 300 && decoded['success'] == true) {
-      return decoded;
-    }
-    throw ApiException(decoded['message']?.toString() ?? 'Terjadi kesalahan, coba lagi.');
-  }
-
   static Future<List<PhysicalOrder>> listMine({required String token}) async {
     http.Response res;
     try {
@@ -39,7 +26,7 @@ class OrderService {
     } catch (_) {
       throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
     }
-    final decoded = _decode(res);
+    final decoded = decodeApiResponse(res);
     final list = decoded['data'] as List<dynamic>? ?? [];
     return list.map((e) => PhysicalOrder.fromJson(e as Map<String, dynamic>)).toList();
   }
@@ -51,7 +38,7 @@ class OrderService {
     } catch (_) {
       throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
     }
-    final decoded = _decode(res);
+    final decoded = decodeApiResponse(res);
     return PhysicalOrder.fromJson(decoded['data'] as Map<String, dynamic>);
   }
 
@@ -86,7 +73,7 @@ class OrderService {
     } catch (_) {
       throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
     }
-    final decoded = _decode(res);
+    final decoded = decodeApiResponse(res);
     final data = decoded['data'] as Map<String, dynamic>;
     return PhysicalOrder.fromJson(data['order'] as Map<String, dynamic>);
   }
@@ -112,6 +99,6 @@ class OrderService {
     } catch (_) {
       throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
     }
-    _decode(res);
+    decodeApiResponse(res);
   }
 }

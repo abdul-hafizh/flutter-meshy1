@@ -5,8 +5,8 @@ import 'package:http_parser/http_parser.dart';
 import 'package:mime/mime.dart';
 
 import '../models/ai_job.dart';
+import 'api_client.dart';
 import 'api_config.dart';
-import 'auth_service.dart' show ApiException;
 
 class CreateJobResult {
   final String jobId;
@@ -50,19 +50,6 @@ class AiJobService {
         'Authorization': 'Bearer $token',
       };
 
-  static Map<String, dynamic> _decode(http.Response res) {
-    Map<String, dynamic> decoded;
-    try {
-      decoded = jsonDecode(res.body) as Map<String, dynamic>;
-    } catch (_) {
-      throw ApiException('Respon server tidak valid.');
-    }
-    if (res.statusCode >= 200 && res.statusCode < 300 && decoded['success'] == true) {
-      return decoded;
-    }
-    throw ApiException(decoded['message']?.toString() ?? 'Terjadi kesalahan, coba lagi.');
-  }
-
   static Future<CreateJobResult> createTextTo3D({
     required String token,
     required String prompt,
@@ -87,7 +74,7 @@ class AiJobService {
       throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
     }
 
-    final decoded = _decode(res);
+    final decoded = decodeApiResponse(res);
     final data = decoded['data'] as Map<String, dynamic>;
     return CreateJobResult(
       jobId: data['jobId'].toString(),
@@ -141,7 +128,7 @@ class AiJobService {
       throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
     }
 
-    final decoded = _decode(res);
+    final decoded = decodeApiResponse(res);
     final data = decoded['data'] as Map<String, dynamic>;
     return CreateJobResult(
       jobId: data['jobId'].toString(),
@@ -161,7 +148,7 @@ class AiJobService {
       throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
     }
 
-    final decoded = _decode(res);
+    final decoded = decodeApiResponse(res);
     final data = decoded['data'] as Map<String, dynamic>;
     final progress = data['progress'];
     return JobSyncResult(
@@ -181,7 +168,7 @@ class AiJobService {
       throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
     }
 
-    final decoded = _decode(res);
+    final decoded = decodeApiResponse(res);
     final list = decoded['data'] as List<dynamic>? ?? [];
     return list.map((e) => AiJobSummary.fromJson(e as Map<String, dynamic>)).toList();
   }
@@ -196,7 +183,7 @@ class AiJobService {
       throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
     }
 
-    final decoded = _decode(res);
+    final decoded = decodeApiResponse(res);
     return AiJobDetail.fromJson(decoded['data'] as Map<String, dynamic>);
   }
 }
