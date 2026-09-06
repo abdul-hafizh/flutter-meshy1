@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import '../data/dummy_data.dart';
+import '../models/product.dart';
 import '../theme/app_theme.dart';
 
-/// Gradient-tinted square placeholder standing in for a product photo.
+/// Gradient-tinted square placeholder standing in for a product photo —
+/// shown whenever a product has no thumbnail, or its image fails to load.
 class ProductThumb extends StatelessWidget {
   final double size;
   final double radius;
@@ -32,7 +33,56 @@ class ProductThumb extends StatelessWidget {
   }
 }
 
-/// Horizontal row-style card used in the Beranda "Trending Creations" list.
+/// Product photo if available, falling back to [ProductThumb] on a missing
+/// URL or a failed load — the one place that decides between the two so
+/// every card stays consistent.
+class _ProductImage extends StatelessWidget {
+  final Product product;
+  final double size;
+  final double radius;
+
+  const _ProductImage({required this.product, required this.size, this.radius = 16});
+
+  @override
+  Widget build(BuildContext context) {
+    final url = product.thumbnailPath;
+    if (url == null || url.isEmpty) {
+      return ProductThumb(size: size, radius: radius);
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: Image.network(
+        url,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => ProductThumb(size: size, radius: radius),
+      ),
+    );
+  }
+}
+
+/// Small "Habis" tag overlaid on an out-of-stock product's image.
+class _OutOfStockBadge extends StatelessWidget {
+  const _OutOfStockBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: const Text(
+        'Habis',
+        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Colors.white),
+      ),
+    );
+  }
+}
+
+/// Horizontal row-style card used in the Beranda "Produk Siap Checkout" list.
 class TrendingProductTile extends StatelessWidget {
   final Product product;
   final VoidCallback? onTap;
@@ -55,14 +105,14 @@ class TrendingProductTile extends StatelessWidget {
           ),
           child: Row(
             children: [
-              const ProductThumb(size: 56),
+              _ProductImage(product: product, size: 56),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      product.name,
+                      product.productName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -73,7 +123,9 @@ class TrendingProductTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      product.category,
+                      product.sellerName ?? product.categoryName ?? '-',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 12.5,
                         color: AppColors.textSecondary,
@@ -114,88 +166,60 @@ class MarketProductCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AspectRatio(
-                aspectRatio: 1,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: AppColors.brandGradientSoft,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Center(
-                    child: ShaderMask(
-                      shaderCallback: (rect) =>
-                          AppColors.brandGradient.createShader(rect),
-                      child: const Icon(
-                        Icons.view_in_ar_rounded,
-                        size: 40,
-                        color: Colors.white,
-                      ),
-                    ),
+        child: Opacity(
+          opacity: product.inStock ? 1 : 0.6,
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AspectRatio(
+                  aspectRatio: 1,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _ProductImage(product: product, size: double.infinity, radius: 14),
+                      if (!product.inStock)
+                        const Positioned(bottom: 8, left: 8, child: _OutOfStockBadge()),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                product.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'oleh ${product.creator ?? '-'}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  const Icon(Icons.star_rounded, size: 15, color: Color(0xFFF5A623)),
-                  const SizedBox(width: 2),
-                  Text(
-                    '${product.rating ?? 0}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
+                const SizedBox(height: 10),
+                Text(
+                  product.productName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
                   ),
-                  Text(
-                    ' · ${product.sold ?? 0} terjual',
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                product.priceLabel,
-                style: const TextStyle(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.orangeDeep,
                 ),
-              ),
-            ],
+                const SizedBox(height: 2),
+                Text(
+                  'oleh ${product.sellerName ?? '-'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  product.priceLabel,
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.orangeDeep,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

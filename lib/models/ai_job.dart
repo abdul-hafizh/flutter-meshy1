@@ -135,6 +135,25 @@ class AiJobLog {
   }
 }
 
+/// The merchant already picked for a job's model, if any — once set, the
+/// customer can no longer pick a different merchant for this job (enforced
+/// server-side in ChatService.ensureOrderForModel).
+class AssignedMerchantInfo {
+  final String id;
+  final String fullName;
+  final String? avatar;
+
+  const AssignedMerchantInfo({required this.id, required this.fullName, this.avatar});
+
+  factory AssignedMerchantInfo.fromJson(Map<String, dynamic> json) {
+    return AssignedMerchantInfo(
+      id: json['Id']?.toString() ?? '',
+      fullName: json['FullName']?.toString() ?? 'Merchant',
+      avatar: json['Avatar']?.toString(),
+    );
+  }
+}
+
 /// Full job detail returned by GET /ai/jobs/:id.
 class AiJobDetail {
   final String id;
@@ -145,6 +164,8 @@ class AiJobDetail {
   final DateTime? finishedAt;
   final List<AiModel> models;
   final List<AiJobLog> logs;
+  final AssignedMerchantInfo? assignedMerchant;
+  final String? assignedOrderId;
 
   const AiJobDetail({
     required this.id,
@@ -155,6 +176,8 @@ class AiJobDetail {
     this.finishedAt,
     required this.models,
     required this.logs,
+    this.assignedMerchant,
+    this.assignedOrderId,
   });
 
   factory AiJobDetail.fromJson(Map<String, dynamic> json) {
@@ -171,6 +194,10 @@ class AiJobDetail {
       logs: (json['Logs'] as List<dynamic>? ?? [])
           .map((e) => AiJobLog.fromJson(e as Map<String, dynamic>))
           .toList(),
+      assignedMerchant: json['AssignedMerchant'] is Map<String, dynamic>
+          ? AssignedMerchantInfo.fromJson(json['AssignedMerchant'] as Map<String, dynamic>)
+          : null,
+      assignedOrderId: json['AssignedOrderId']?.toString(),
     );
   }
 

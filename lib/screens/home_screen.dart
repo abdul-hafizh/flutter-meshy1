@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/dummy_data.dart';
+import '../models/product.dart';
 import '../providers/auth_controller.dart';
+import '../services/auth_service.dart' show ApiException;
+import '../services/product_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/category_tile.dart';
 import '../widgets/product_card.dart';
@@ -9,11 +12,42 @@ import '../widgets/section_header.dart';
 import '../widgets/token_balance_badge.dart';
 import 'buy_tokens_screen.dart';
 import 'chat/chat_list_screen.dart';
+import 'product_detail_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   final VoidCallback onCreateTap;
 
   const HomeScreen({super.key, required this.onCreateTap});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  List<Product>? _readyProducts;
+  bool _loadingProducts = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_readyProducts == null) _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    final token = context.read<AuthController>().token;
+    if (token == null) return;
+    try {
+      final products = await ProductService.listProducts(token: token, isPublished: true, limit: 20);
+      if (!mounted) return;
+      setState(() {
+        _readyProducts = products.where((p) => p.inStock).take(6).toList();
+        _loadingProducts = false;
+      });
+    } on ApiException catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingProducts = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -91,7 +125,7 @@ class HomeScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 22),
-          _CreatePromptCard(onTap: onCreateTap),
+          _CreatePromptCard(onTap: widget.onCreateTap),
           const SizedBox(height: 26),
           const Text(
             'Kategori',
@@ -111,12 +145,31 @@ class HomeScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 26),
-          SectionHeader(title: 'Trending Creations', actionLabel: 'Lihat Semua', onAction: () {}),
+          SectionHeader(title: 'Produk Siap Checkout', actionLabel: 'Lihat Semua', onAction: () {}),
           const SizedBox(height: 12),
-          for (final p in kTrendingProducts) ...[
-            TrendingProductTile(product: p),
-            if (p != kTrendingProducts.last) const SizedBox(height: 10),
-          ],
+          if (_loadingProducts)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_readyProducts == null || _readyProducts!.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'Belum ada produk siap checkout dari merchant.',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
+            )
+          else
+            for (final p in _readyProducts!) ...[
+              TrendingProductTile(
+                product: p,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => ProductDetailScreen(product: p)),
+                ),
+              ),
+              if (p != _readyProducts!.last) const SizedBox(height: 10),
+            ],
         ],
       ),
     );

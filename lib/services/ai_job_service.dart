@@ -55,6 +55,9 @@ class AiJobService {
     required String prompt,
     String artStyle = 'realistic',
     String? negativePrompt,
+    double? length,
+    double? width,
+    double? height,
   }) async {
     http.Response res;
     try {
@@ -67,6 +70,9 @@ class AiJobService {
               'artStyle': artStyle,
               if (negativePrompt != null && negativePrompt.trim().isNotEmpty)
                 'negativePrompt': negativePrompt.trim(),
+              if (length != null) 'TargetLength': length,
+              if (width != null) 'TargetWidth': width,
+              if (height != null) 'TargetHeight': height,
             }),
           )
           .timeout(const Duration(seconds: 30));
@@ -93,6 +99,9 @@ class AiJobService {
     String? prompt,
     String artStyle = 'realistic',
     String? negativePrompt,
+    double? length,
+    double? width,
+    double? height,
   }) async {
     assert(images.isNotEmpty && images.length <= 4);
     http.Response res;
@@ -121,6 +130,9 @@ class AiJobService {
       if (negativePrompt != null && negativePrompt.trim().isNotEmpty) {
         request.fields['negativePrompt'] = negativePrompt.trim();
       }
+      if (length != null) request.fields['TargetLength'] = '$length';
+      if (width != null) request.fields['TargetWidth'] = '$width';
+      if (height != null) request.fields['TargetHeight'] = '$height';
 
       final streamed = await request.send().timeout(const Duration(seconds: 60));
       res = await http.Response.fromStream(streamed);

@@ -35,6 +35,9 @@ class CreateScreen extends StatefulWidget {
 class _CreateScreenState extends State<CreateScreen> {
   final TextEditingController _controller = TextEditingController();
   final TextEditingController _negativeController = TextEditingController();
+  final TextEditingController _lengthController = TextEditingController();
+  final TextEditingController _widthController = TextEditingController();
+  final TextEditingController _heightController = TextEditingController();
   String _selectedCategory = 'Figurine';
   String _artStyle = 'realistic';
   _CreateMode _mode = _CreateMode.text;
@@ -60,8 +63,13 @@ class _CreateScreenState extends State<CreateScreen> {
   void dispose() {
     _controller.dispose();
     _negativeController.dispose();
+    _lengthController.dispose();
+    _widthController.dispose();
+    _heightController.dispose();
     super.dispose();
   }
+
+  double? _parseDim(String text) => double.tryParse(text.trim().replaceAll(',', '.'));
 
   bool get _canGenerate =>
       _mode == _CreateMode.text ? _hasText : _pickedImages.isNotEmpty;
@@ -114,6 +122,10 @@ class _CreateScreenState extends State<CreateScreen> {
       return;
     }
 
+    final targetLength = _parseDim(_lengthController.text);
+    final targetWidth = _parseDim(_widthController.text);
+    final targetHeight = _parseDim(_heightController.text);
+
     setState(() => _generating = true);
     try {
       if (_mode == _CreateMode.text) {
@@ -122,6 +134,9 @@ class _CreateScreenState extends State<CreateScreen> {
           prompt: _controller.text.trim(),
           artStyle: _artStyle,
           negativePrompt: _negativeController.text,
+          length: targetLength,
+          width: targetWidth,
+          height: targetHeight,
         );
       } else {
         await AiJobService.createImageTo3D(
@@ -137,11 +152,17 @@ class _CreateScreenState extends State<CreateScreen> {
           prompt: _controller.text.trim().isEmpty ? null : _controller.text.trim(),
           artStyle: _artStyle,
           negativePrompt: _negativeController.text,
+          length: targetLength,
+          width: targetWidth,
+          height: targetHeight,
         );
       }
       if (!mounted) return;
       _controller.clear();
       _negativeController.clear();
+      _lengthController.clear();
+      _widthController.clear();
+      _heightController.clear();
       setState(() {
         _pickedImages.clear();
         _pickedImageBytesList.clear();
@@ -302,6 +323,36 @@ class _CreateScreenState extends State<CreateScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 22),
+          const Text(
+            'Dimensi Hasil Cetak (cm, opsional)',
+            style: TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Bantu merchant memperkirakan bahan & harga cetak',
+            style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _DimensionField(label: 'Panjang', controller: _lengthController),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _DimensionField(label: 'Lebar', controller: _widthController),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _DimensionField(label: 'Tinggi', controller: _heightController),
+              ),
+            ],
+          ),
           const SizedBox(height: 24),
           const Text(
             'Kategori',
@@ -353,6 +404,48 @@ class _CreateScreenState extends State<CreateScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DimensionField extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+
+  const _DimensionField({required this.label, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.surfaceMuted,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: TextField(
+            controller: controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+            decoration: const InputDecoration(
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              border: InputBorder.none,
+              hintText: '0',
+              suffixText: 'cm',
+              suffixStyle: TextStyle(fontSize: 12, color: AppColors.textFaint),
+              hintStyle: TextStyle(fontSize: 13.5, color: AppColors.textFaint),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

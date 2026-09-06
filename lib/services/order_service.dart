@@ -42,6 +42,30 @@ class OrderService {
     return PhysicalOrder.fromJson(decoded['data'] as Map<String, dynamic>);
   }
 
+  /// Buys a ready-made product directly — skips the prompt/chat flow
+  /// entirely, returning an order that's already priced and ready for
+  /// [CheckoutScreen].
+  static Future<PhysicalOrder> createFromProduct({
+    required String token,
+    required String productId,
+    int quantity = 1,
+  }) async {
+    http.Response res;
+    try {
+      res = await http
+          .post(
+            _uri('/orders/from-product'),
+            headers: _headers(token),
+            body: jsonEncode({'ProductId': productId, 'Quantity': quantity}),
+          )
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
+    }
+    final decoded = decodeApiResponse(res);
+    return PhysicalOrder.fromJson(decoded['data'] as Map<String, dynamic>);
+  }
+
   static Future<PhysicalOrder> checkout({
     required String token,
     required String orderId,

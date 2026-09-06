@@ -261,6 +261,28 @@ class _ModelPreview extends StatelessWidget {
         ),
       );
     }
+    final productThumb = item?.product?.thumbnailUrl;
+    if (productThumb != null && productThumb.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Image.network(
+          productThumb,
+          height: 220,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => const _ModelPreviewFallback(),
+        ),
+      );
+    }
+    return const _ModelPreviewFallback();
+  }
+}
+
+class _ModelPreviewFallback extends StatelessWidget {
+  const _ModelPreviewFallback();
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       height: 160,
       alignment: Alignment.center,

@@ -6,12 +6,14 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/ai_job.dart';
-import '../models/merchant.dart';
+import '../models/nearby_merchant.dart';
 import '../providers/auth_controller.dart';
 import '../providers/chat_controller.dart';
 import '../services/ai_job_service.dart';
 import '../services/auth_service.dart' show ApiException;
 import '../services/chat_service.dart';
+import '../services/merchant_service.dart';
+import '../services/user_address_service.dart';
 import '../theme/app_theme.dart';
 import 'chat/chat_screen.dart';
 
@@ -40,7 +42,7 @@ class _JobDetailViewState extends State<JobDetailView> {
   AiJobDetail? _detail;
 
   bool _merchantsLoading = true;
-  List<Merchant> _merchants = [];
+  List<NearbyMerchant> _merchants = [];
   String? _openingChatMerchantId;
 
   // Polls Meshy for progress while the job is still running so the preview
@@ -88,7 +90,22 @@ class _JobDetailViewState extends State<JobDetailView> {
     final token = _token;
     if (token == null) return;
     try {
-      final merchants = await ChatService.listMerchants(token: token);
+      // Bias the nearby list toward the customer's own saved-address city —
+      // the app has no GPS/maps package, so this is the best "where is the
+      // customer" signal available today.
+      int? cityId;
+      try {
+        final addresses = await UserAddressService.listMine(token: token);
+        if (addresses.isNotEmpty) {
+          final defaultAddress = addresses.firstWhere((a) => a.isDefault, orElse: () => addresses.first);
+          cityId = defaultAddress.cityId;
+        }
+      } catch (_) {
+        // No saved address yet — fall through with cityId == null, the
+        // backend still returns every merchant, just unranked by city.
+      }
+
+      final merchants = await MerchantService.listNearby(token: token, cityId: cityId);
       if (!mounted) return;
       setState(() => _merchants = merchants);
     } catch (_) {
@@ -98,36 +115,16 @@ class _JobDetailViewState extends State<JobDetailView> {
     }
   }
 
-  Future<void> _openChat(Merchant merchant) async {
+  Future<void> _openChatWith(String merchantId) async {
     final token = _token;
     if (token == null) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Konfirmasi'),
-        content: Text(
-          'Apa kamu yakin akan berkonsultasi dengan penjual ${merchant.fullName.isNotEmpty ? merchant.fullName : 'ini'}?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Batal'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Ya, Lanjutkan'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
     if (!mounted) return;
-    setState(() => _openingChatMerchantId = merchant.id);
+    setState(() => _openingChatMerchantId = merchantId);
     try {
       final client = await context.read<ChatController>().ensureConnected(token);
       final info = await ChatService.createOrGetChannel(
         token: token,
-        merchantId: merchant.id,
+        merchantId: merchantId,
         jobId: widget.jobId,
         previewUrl: _detail?.primaryModel?.previewUrl,
         prompt: _detail?.prompt,
@@ -137,6 +134,8 @@ class _JobDetailViewState extends State<JobDetailView> {
       await Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => ChatScreen(client: client, channel: channel)),
       );
+      if (!mounted) return;
+      await _load();
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -148,6 +147,33 @@ class _JobDetailViewState extends State<JobDetailView> {
     } finally {
       if (mounted) setState(() => _openingChatMerchantId = null);
     }
+  }
+
+  /// First-time merchant pick — confirms since it locks the design to that
+  /// merchant (server-side, see ChatService.ensureOrderForModel).
+  Future<void> _pickMerchant(NearbyMerchant merchant) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Konfirmasi'),
+        content: Text(
+          'Pilih ${merchant.fullName.isNotEmpty ? merchant.fullName : 'penjual ini'} untuk membuatkan desain ini? '
+          'Setelah dipilih, kamu tidak bisa memilih merchant lain untuk desain ini.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Ya, Pilih'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _openChatWith(merchant.id);
   }
 
   Future<void> _load() async {
@@ -302,46 +328,70 @@ class _JobDetailViewState extends State<JobDetailView> {
                                 ],
                               ),
                               const SizedBox(height: 22),
-                              const Text(
-                                'Chat dengan Penjual',
-                                style: TextStyle(
-                                  fontSize: 14.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              const Text(
-                                'Setelah chat dengan penjual, pantau pesananmu di tab Pesanan Fisik.',
-                                style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-                              ),
-                              const SizedBox(height: 10),
-                              if (_merchantsLoading)
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 12),
-                                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                )
-                              else if (_merchants.isEmpty)
+                              if (detail.assignedMerchant != null) ...[
                                 const Text(
-                                  'Belum ada penjual yang tersedia.',
-                                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                                )
-                              else
-                                Column(
-                                  children: [
-                                    for (final merchant in _merchants)
-                                      Padding(
-                                        padding: const EdgeInsets.only(bottom: 10),
-                                        child: _MerchantTile(
-                                          merchant: merchant,
-                                          loading: _openingChatMerchantId == merchant.id,
-                                          onTap: _openingChatMerchantId == null
-                                              ? () => _openChat(merchant)
-                                              : null,
-                                        ),
-                                      ),
-                                  ],
+                                  'Merchant Kamu',
+                                  style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.textPrimary,
+                                  ),
                                 ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'Desain ini sudah dipilih untuk merchant berikut — kamu tidak bisa memilih merchant lain lagi.',
+                                  style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                                ),
+                                const SizedBox(height: 10),
+                                _AssignedMerchantCard(
+                                  merchant: detail.assignedMerchant!,
+                                  loading: _openingChatMerchantId == detail.assignedMerchant!.id,
+                                  onChat: _openingChatMerchantId == null
+                                      ? () => _openChatWith(detail.assignedMerchant!.id)
+                                      : null,
+                                ),
+                              ] else ...[
+                                const Text(
+                                  'Pilih Merchant Terdekat',
+                                  style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'Sekali memilih merchant, desain ini akan dibuatkan oleh merchant tersebut dan tidak bisa dipindah lagi.',
+                                  style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                                ),
+                                const SizedBox(height: 10),
+                                if (_merchantsLoading)
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 12),
+                                    child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                  )
+                                else if (_merchants.isEmpty)
+                                  const Text(
+                                    'Belum ada merchant yang tersedia.',
+                                    style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                  )
+                                else
+                                  Column(
+                                    children: [
+                                      for (final merchant in _merchants)
+                                        Padding(
+                                          padding: const EdgeInsets.only(bottom: 10),
+                                          child: _NearbyMerchantTile(
+                                            merchant: merchant,
+                                            loading: _openingChatMerchantId == merchant.id,
+                                            onTap: _openingChatMerchantId == null
+                                                ? () => _pickMerchant(merchant)
+                                                : null,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                              ],
                             ],
                           ],
                         ),
@@ -470,12 +520,12 @@ class _FileChip extends StatelessWidget {
   }
 }
 
-class _MerchantTile extends StatelessWidget {
-  final Merchant merchant;
+class _NearbyMerchantTile extends StatelessWidget {
+  final NearbyMerchant merchant;
   final bool loading;
   final VoidCallback? onTap;
 
-  const _MerchantTile({required this.merchant, required this.loading, required this.onTap});
+  const _NearbyMerchantTile({required this.merchant, required this.loading, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -510,27 +560,59 @@ class _MerchantTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      merchant.fullName.isNotEmpty ? merchant.fullName : 'Penjual',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    if (merchant.address != null && merchant.address!.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(
-                          merchant.address!,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            merchant.fullName.isNotEmpty ? merchant.fullName : 'Penjual',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
                         ),
+                        if (merchant.distanceLabel.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            '~${merchant.distanceLabel}',
+                            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.orangeDeep),
+                          ),
+                        ],
+                      ],
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.place_outlined, size: 13, color: AppColors.textFaint),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              merchant.locationLine,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            ),
+                          ),
+                        ],
                       ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.star_rounded, size: 14, color: Color(0xFFF5A623)),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${merchant.rating} · ${merchant.totalReviews} ulasan',
+                            style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -541,10 +623,91 @@ class _MerchantTile extends StatelessWidget {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               else
-                const Icon(Icons.chat_bubble_outline_rounded, size: 20, color: AppColors.purple),
+                const Icon(Icons.chevron_right_rounded, size: 22, color: AppColors.purple),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _AssignedMerchantCard extends StatelessWidget {
+  final AssignedMerchantInfo merchant;
+  final bool loading;
+  final VoidCallback? onChat;
+
+  const _AssignedMerchantCard({required this.merchant, required this.loading, required this.onChat});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: AppColors.brandGradientSoft,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: AppColors.surface,
+            backgroundImage: merchant.avatar != null && merchant.avatar!.isNotEmpty
+                ? NetworkImage(merchant.avatar!)
+                : null,
+            child: merchant.avatar == null || merchant.avatar!.isEmpty
+                ? const Icon(Icons.storefront_rounded, size: 18, color: AppColors.purple)
+                : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  merchant.fullName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 2),
+                const Row(
+                  children: [
+                    Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.textSecondary),
+                    SizedBox(width: 4),
+                    Text('Merchant terpilih', style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(30),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(30),
+              onTap: onChat,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: loading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.chat_bubble_outline_rounded, size: 16, color: AppColors.purple),
+                          SizedBox(width: 6),
+                          Text('Chat', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.purple)),
+                        ],
+                      ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -50,13 +50,32 @@ class OrderMerchantInfo {
   }
 }
 
+class OrderProductInfo {
+  final String id;
+  final String name;
+  final String? thumbnailUrl;
+  final int? price;
+
+  const OrderProductInfo({required this.id, required this.name, this.thumbnailUrl, this.price});
+
+  factory OrderProductInfo.fromJson(Map<String, dynamic> json) {
+    return OrderProductInfo(
+      id: json['Id']?.toString() ?? '',
+      name: json['ProductName']?.toString() ?? 'Produk',
+      thumbnailUrl: json['ThumbnailPath']?.toString(),
+      price: json['Price'] is int ? json['Price'] as int : int.tryParse('${json['Price']}'),
+    );
+  }
+}
+
 class PhysicalOrderItem {
   final String id;
   final int? quantity;
   final int? unitPrice;
   final AiModel? aiModel;
+  final OrderProductInfo? product;
 
-  const PhysicalOrderItem({required this.id, this.quantity, this.unitPrice, this.aiModel});
+  const PhysicalOrderItem({required this.id, this.quantity, this.unitPrice, this.aiModel, this.product});
 
   factory PhysicalOrderItem.fromJson(Map<String, dynamic> json) {
     return PhysicalOrderItem(
@@ -64,6 +83,7 @@ class PhysicalOrderItem {
       quantity: json['Quantity'] is int ? json['Quantity'] as int : int.tryParse('${json['Quantity']}'),
       unitPrice: json['UnitPrice'] is int ? json['UnitPrice'] as int : int.tryParse('${json['UnitPrice']}'),
       aiModel: json['AIModel'] is Map<String, dynamic> ? AiModel.fromJson(json['AIModel'] as Map<String, dynamic>) : null,
+      product: json['Product'] is Map<String, dynamic> ? OrderProductInfo.fromJson(json['Product'] as Map<String, dynamic>) : null,
     );
   }
 }
