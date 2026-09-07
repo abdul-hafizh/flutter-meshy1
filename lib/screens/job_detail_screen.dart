@@ -602,16 +602,21 @@ class _NearbyMerchantTile extends StatelessWidget {
                     ),
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.star_rounded, size: 14, color: Color(0xFFF5A623)),
-                          const SizedBox(width: 2),
-                          Text(
-                            '${merchant.rating} · ${merchant.totalReviews} ulasan',
-                            style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-                          ),
-                        ],
-                      ),
+                      child: merchant.hasRating
+                          ? Row(
+                              children: [
+                                const Icon(Icons.star_rounded, size: 14, color: Color(0xFFF5A623)),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '${merchant.rating} · ${merchant.totalReviews} ulasan',
+                                  style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                                ),
+                              ],
+                            )
+                          : const Text(
+                              'Belum ada rating',
+                              style: TextStyle(fontSize: 11.5, color: AppColors.textFaint),
+                            ),
                     ),
                   ],
                 ),

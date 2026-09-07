@@ -6,15 +6,24 @@ import '../providers/chat_controller.dart';
 import '../theme/app_theme.dart';
 import 'addresses/address_list_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
-  static const int _currentTierIndex = 1; // Silver
-  static const int _totalCetak = 23;
-  static const int _poin = 2450;
-  static const int _diskonPersen = 5;
-  static const int _cetakUntukNaik = 28;
-  static const int _totalBelanja = 2450000;
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // UserLevel/TotalSpent/DiscountPercent are recalculated server-side on
+    // every GET /auth/me (see AuthService.getProfile), so refresh once here
+    // to pick up tier changes from a payment made elsewhere in the app.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AuthController>().refreshUser();
+    });
+  }
 
   Future<void> _confirmLogout(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -57,8 +66,8 @@ class ProfileScreen extends StatelessWidget {
     }
   }
 
-  String _rupiah(int v) {
-    final s = v.toString();
+  String _rupiah(num v) {
+    final s = v.round().toString();
     final buf = StringBuffer();
     for (int i = 0; i < s.length; i++) {
       final posFromEnd = s.length - i;
@@ -70,11 +79,19 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currentTier = kLoyaltyTiers[_currentTierIndex];
-    final nextTier = _currentTierIndex + 1 < kLoyaltyTiers.length
-        ? kLoyaltyTiers[_currentTierIndex + 1]
-        : null;
     final user = context.watch<AuthController>().user;
+    final currentTierIndex = user == null
+        ? 0
+        : kLoyaltyTiers.indexWhere((t) => t.key == user.userLevel.toUpperCase());
+    final currentTier = kLoyaltyTiers[currentTierIndex < 0 ? 0 : currentTierIndex];
+    final tierDetails = user?.tierDetails;
+    final nextTierName = tierDetails?.nextTier != null
+        ? kLoyaltyTiers.firstWhere(
+            (t) => t.key == tierDetails!.nextTier,
+            orElse: () => currentTier,
+          ).name
+        : null;
+    final progress = (tierDetails?.progressPercent ?? 0) / 100;
 
     return SafeArea(
       bottom: false,
@@ -179,22 +196,21 @@ class ProfileScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Loyalty Program',
+                  'Tier & Diskon',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white),
                 ),
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    _LoyaltyStat(value: '$_totalCetak', label: 'Total Cetak'),
-                    _LoyaltyStat(value: '$_poin', label: 'Poin'),
-                    _LoyaltyStat(value: '$_diskonPersen%', label: 'Diskon'),
+                    _LoyaltyStat(value: currentTier.name, label: 'Level'),
+                    _LoyaltyStat(value: '${user?.discountPercent ?? 0}%', label: 'Diskon'),
                   ],
                 ),
                 const SizedBox(height: 18),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(6),
                   child: LinearProgressIndicator(
-                    value: 0.45,
+                    value: progress.clamp(0, 1).toDouble(),
                     minHeight: 8,
                     backgroundColor: Colors.white.withValues(alpha: 0.25),
                     valueColor: const AlwaysStoppedAnimation(Colors.white),
@@ -205,13 +221,15 @@ class ProfileScreen extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(currentTier.name, style: TextStyle(fontSize: 11.5, color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w600)),
-                    Text(nextTier?.name ?? '', style: TextStyle(fontSize: 11.5, color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w600)),
+                    Text(nextTierName ?? 'MAX', style: TextStyle(fontSize: 11.5, color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w600)),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Center(
                   child: Text(
-                    '$_cetakUntukNaik cetak lagi untuk naik tier',
+                    nextTierName != null
+                        ? '${_rupiah(tierDetails?.remainingForNextTier ?? 0)} lagi menuju $nextTierName'
+                        : 'Kamu sudah di tier tertinggi 🎉',
                     style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.9)),
                   ),
                 ),
@@ -230,12 +248,12 @@ class ProfileScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Tier & Diskon',
+                  'Semua Tier',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 12),
                 for (int i = 0; i < kLoyaltyTiers.length; i++) ...[
-                  _TierRow(tier: kLoyaltyTiers[i], isCurrent: i == _currentTierIndex),
+                  _TierRow(tier: kLoyaltyTiers[i], isCurrent: i == currentTierIndex),
                   if (i != kLoyaltyTiers.length - 1) const Divider(height: 22, color: AppColors.border),
                 ],
               ],
@@ -253,20 +271,18 @@ class ProfileScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Statistik',
+                  'Total Belanja',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                 ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _StatBlock(value: '$_totalCetak', label: 'Produk Dibuat'),
-                    ),
-                    Container(width: 1, height: 36, color: AppColors.border),
-                    Expanded(
-                      child: _StatBlock(value: _rupiah(_totalBelanja), label: 'Total Belanja'),
-                    ),
-                  ],
+                const SizedBox(height: 6),
+                Text(
+                  _rupiah(user?.totalSpent ?? 0),
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Akumulasi transaksi yang sudah dibayar — menentukan tier & diskon kamu.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -363,26 +379,35 @@ class _TierRow extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                tier.name,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+              Row(
+                children: [
+                  Text(
+                    tier.name,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                  ),
+                  if (isCurrent) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.orange.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text(
+                        'KAMU',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.orange),
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              if (isCurrent) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.orange.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Text(
-                    'KAMU',
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.orange),
-                  ),
-                ),
-              ],
+              Text(
+                tier.range,
+                style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+              ),
             ],
           ),
         ),
@@ -393,30 +418,6 @@ class _TierRow extends StatelessWidget {
             fontWeight: FontWeight.w700,
             color: tier.discountLabel == 'Standard' ? AppColors.textSecondary : AppColors.success,
           ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatBlock extends StatelessWidget {
-  final String value;
-  final String label;
-
-  const _StatBlock({required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
         ),
       ],
     );

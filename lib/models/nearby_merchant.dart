@@ -10,7 +10,7 @@ class NearbyMerchant {
   final String? provinceName;
   final String? countryName;
   final double? distanceKm;
-  final double rating;
+  final double? rating;
   final int totalReviews;
 
   const NearbyMerchant({
@@ -22,7 +22,7 @@ class NearbyMerchant {
     this.provinceName,
     this.countryName,
     this.distanceKm,
-    this.rating = 5.0,
+    this.rating,
     this.totalReviews = 0,
   });
 
@@ -40,7 +40,7 @@ class NearbyMerchant {
       provinceName: province is Map<String, dynamic> ? province['Name']?.toString() : null,
       countryName: country is Map<String, dynamic> ? country['Name']?.toString() : null,
       distanceKm: json['DistanceKm'] is num ? (json['DistanceKm'] as num).toDouble() : null,
-      rating: json['Rating'] is num ? (json['Rating'] as num).toDouble() : 5.0,
+      rating: json['Rating'] is num ? (json['Rating'] as num).toDouble() : null,
       totalReviews: json['TotalReviews'] is int ? json['TotalReviews'] as int : int.tryParse('${json['TotalReviews']}') ?? 0,
     );
   }
@@ -57,4 +57,6 @@ class NearbyMerchant {
   }
 
   String get distanceLabel => distanceKm != null ? '${distanceKm!.toStringAsFixed(1)} km' : '';
+
+  bool get hasRating => rating != null && totalReviews > 0;
 }

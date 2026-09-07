@@ -100,7 +100,12 @@ const List<Order> kOrders = [
   ),
 ];
 
+/// Mirrors the backend's `userTierHelper.calculateTier()` thresholds
+/// (`E:\Proyek\api-meshy\src\utils\userTierHelper.js`) — [key] matches the
+/// `UserLevel` string the API returns, so the profile screen can look up
+/// the current tier by exact match instead of guessing from a display name.
 class LoyaltyTier {
+  final String key;
   final String name;
   final String range;
   final String discountLabel;
@@ -108,6 +113,7 @@ class LoyaltyTier {
   final Color color;
 
   const LoyaltyTier({
+    required this.key,
     required this.name,
     required this.range,
     required this.discountLabel,
@@ -118,30 +124,42 @@ class LoyaltyTier {
 
 const List<LoyaltyTier> kLoyaltyTiers = [
   LoyaltyTier(
+    key: 'BRONZE',
     name: 'Bronze',
-    range: '0-10 cetak',
+    range: 'Rp 0 – < Rp 500rb',
     discountLabel: 'Standard',
     icon: Icons.military_tech_rounded,
     color: Color(0xFFC77B4A),
   ),
   LoyaltyTier(
+    key: 'SILVER',
     name: 'Silver',
-    range: '11-50 cetak',
+    range: '≥ Rp 500rb',
     discountLabel: '-5%',
     icon: Icons.military_tech_rounded,
     color: Color(0xFF9AA3AF),
   ),
   LoyaltyTier(
+    key: 'GOLD',
     name: 'Gold',
-    range: '51-199 cetak',
+    range: '≥ Rp 1jt',
     discountLabel: '-10%',
     icon: Icons.emoji_events_rounded,
     color: Color(0xFFE0AA23),
   ),
   LoyaltyTier(
-    name: 'Sultan',
-    range: '200+ cetak',
+    key: 'PLATINUM',
+    name: 'Platinum',
+    range: '≥ Rp 5jt',
     discountLabel: '-20%',
+    icon: Icons.diamond_outlined,
+    color: Color(0xFF4FA8E0),
+  ),
+  LoyaltyTier(
+    key: 'SOLITAIRE',
+    name: 'Solitaire',
+    range: '≥ Rp 10jt',
+    discountLabel: '-30%',
     icon: Icons.diamond_rounded,
     color: Color(0xFF9B2FCE),
   ),
