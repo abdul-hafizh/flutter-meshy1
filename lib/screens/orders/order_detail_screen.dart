@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/physical_order.dart';
 import '../../providers/auth_controller.dart';
+import '../../services/api_config.dart';
 import '../../services/auth_service.dart' show ApiException;
 import '../../services/order_service.dart';
 import '../../services/shipment_tracking_service.dart';
@@ -266,7 +267,7 @@ class _ModelPreview extends StatelessWidget {
       return ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: Image.network(
-          productThumb,
+          ApiConfig.assetUrl(productThumb),
           height: 220,
           width: double.infinity,
           fit: BoxFit.cover,

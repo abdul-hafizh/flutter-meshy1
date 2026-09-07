@@ -310,6 +310,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       else
                         DropdownButtonFormField<int>(
                           initialValue: _selectedPaymentMethodId,
+                          isExpanded: true,
                           decoration: InputDecoration(
                             filled: true,
                             fillColor: AppColors.surface,

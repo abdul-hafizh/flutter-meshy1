@@ -26,6 +26,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<Product>? _readyProducts;
   bool _loadingProducts = true;
+  String? _loadError;
 
   @override
   void didChangeDependencies() {
@@ -36,6 +37,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadProducts() async {
     final token = context.read<AuthController>().token;
     if (token == null) return;
+    setState(() {
+      _loadingProducts = true;
+      _loadError = null;
+    });
     try {
       final products = await ProductService.listProducts(token: token, isPublished: true, limit: 20);
       if (!mounted) return;
@@ -43,9 +48,12 @@ class _HomeScreenState extends State<HomeScreen> {
         _readyProducts = products.where((p) => p.inStock).take(6).toList();
         _loadingProducts = false;
       });
-    } on ApiException catch (_) {
+    } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() => _loadingProducts = false);
+      setState(() {
+        _loadingProducts = false;
+        _loadError = e.message;
+      });
     }
   }
 
@@ -151,6 +159,21 @@ class _HomeScreenState extends State<HomeScreen> {
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
               child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_loadError != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Gagal memuat produk: $_loadError',
+                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                    ),
+                  ),
+                  TextButton(onPressed: _loadProducts, child: const Text('Coba lagi')),
+                ],
+              ),
             )
           else if (_readyProducts == null || _readyProducts!.isEmpty)
             const Padding(

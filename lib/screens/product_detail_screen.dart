@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/product.dart';
 import '../providers/auth_controller.dart';
 import '../services/auth_service.dart' show ApiException;
+import '../services/api_config.dart';
 import '../services/order_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/gradient_button.dart';
@@ -65,7 +66,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 borderRadius: BorderRadius.circular(22),
                 child: product.thumbnailPath != null && product.thumbnailPath!.isNotEmpty
                     ? Image.network(
-                        product.thumbnailPath!,
+                        ApiConfig.assetUrl(product.thumbnailPath!),
                         fit: BoxFit.cover,
                         errorBuilder: (_, _, _) => const _DetailThumbFallback(),
                       )

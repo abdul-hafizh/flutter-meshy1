@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/product.dart';
+import '../services/api_config.dart';
 import '../theme/app_theme.dart';
 
 /// Gradient-tinted square placeholder standing in for a product photo —
@@ -45,14 +46,14 @@ class _ProductImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final url = product.thumbnailPath;
-    if (url == null || url.isEmpty) {
+    final path = product.thumbnailPath;
+    if (path == null || path.isEmpty) {
       return ProductThumb(size: size, radius: radius);
     }
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
       child: Image.network(
-        url,
+        ApiConfig.assetUrl(path),
         width: size,
         height: size,
         fit: BoxFit.cover,

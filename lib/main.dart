@@ -4,9 +4,14 @@ import 'package:provider/provider.dart';
 import 'providers/auth_controller.dart';
 import 'providers/chat_controller.dart';
 import 'screens/auth/auth_gate.dart';
+import 'services/api_config.dart';
 import 'theme/app_theme.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Loads the last known-good API origin from disk, then kicks off a
+  // background refresh — never blocks startup on the network.
+  await ApiConfig.init();
   runApp(const SnapyApp());
 }
 
