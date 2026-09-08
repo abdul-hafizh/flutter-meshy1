@@ -12,6 +12,8 @@ class NearbyMerchant {
   final double? distanceKm;
   final double? rating;
   final int totalReviews;
+  final int queueCount;
+  final DateTime? estimatedAvailableAt;
 
   const NearbyMerchant({
     required this.id,
@@ -24,6 +26,8 @@ class NearbyMerchant {
     this.distanceKm,
     this.rating,
     this.totalReviews = 0,
+    this.queueCount = 0,
+    this.estimatedAvailableAt,
   });
 
   factory NearbyMerchant.fromJson(Map<String, dynamic> json) {
@@ -42,6 +46,10 @@ class NearbyMerchant {
       distanceKm: json['DistanceKm'] is num ? (json['DistanceKm'] as num).toDouble() : null,
       rating: json['Rating'] is num ? (json['Rating'] as num).toDouble() : null,
       totalReviews: json['TotalReviews'] is int ? json['TotalReviews'] as int : int.tryParse('${json['TotalReviews']}') ?? 0,
+      queueCount: json['QueueCount'] is int ? json['QueueCount'] as int : int.tryParse('${json['QueueCount']}') ?? 0,
+      estimatedAvailableAt: json['EstimatedAvailableAt'] != null
+          ? DateTime.tryParse(json['EstimatedAvailableAt'].toString())
+          : null,
     );
   }
 
@@ -59,4 +67,25 @@ class NearbyMerchant {
   String get distanceLabel => distanceKm != null ? '${distanceKm!.toStringAsFixed(1)} km' : '';
 
   bool get hasRating => rating != null && totalReviews > 0;
+
+  bool get hasActiveQueue => queueCount > 0;
+
+  /// "Tidak ada antrian" when idle, otherwise "N antrian · longgar ~waktu" —
+  /// gives the customer a rough sense of when this merchant's printer(s)
+  /// would actually get to a new job, based on the merchant dashboard's own
+  /// print-queue estimate (same WAITING/IN_PROGRESS chain, EstimatedFinishAt).
+  String get queueLabel {
+    if (!hasActiveQueue) return 'Tidak ada antrian';
+    final eta = estimatedAvailableAt;
+    final suffix = eta != null ? ' · longgar ${_relativeEta(eta)}' : '';
+    return '$queueCount antrian$suffix';
+  }
+
+  static String _relativeEta(DateTime target) {
+    final diff = target.difference(DateTime.now());
+    if (diff.isNegative || diff.inMinutes < 1) return 'sebentar lagi';
+    if (diff.inMinutes < 60) return '~${diff.inMinutes} menit lagi';
+    if (diff.inHours < 24) return '~${diff.inHours} jam lagi';
+    return '~${diff.inDays} hari lagi';
+  }
 }

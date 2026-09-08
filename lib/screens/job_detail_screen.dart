@@ -618,6 +618,31 @@ class _NearbyMerchantTile extends StatelessWidget {
                               style: TextStyle(fontSize: 11.5, color: AppColors.textFaint),
                             ),
                     ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.print_outlined,
+                            size: 13,
+                            color: merchant.hasActiveQueue ? AppColors.orangeDeep : Colors.green,
+                          ),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              merchant.queueLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: merchant.hasActiveQueue ? AppColors.orangeDeep : Colors.green,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
