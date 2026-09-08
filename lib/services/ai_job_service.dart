@@ -185,6 +185,22 @@ class AiJobService {
     return list.map((e) => AiJobSummary.fromJson(e as Map<String, dynamic>)).toList();
   }
 
+  /// Manually (re)starts Stage 2 (color & texture refine) for a text-to-3D
+  /// job — used when the automatic refine that normally follows Stage 1
+  /// (see the cron sync) failed and left the job stuck with a colorless
+  /// preview mesh.
+  static Future<void> refineJob({required String token, required String jobId}) async {
+    http.Response res;
+    try {
+      res = await http.post(_uri('/ai/jobs/$jobId/refine'), headers: _headers(token)).timeout(
+            const Duration(seconds: 30),
+          );
+    } catch (_) {
+      throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
+    }
+    decodeApiResponse(res);
+  }
+
   static Future<AiJobDetail> getJobDetail({required String token, required String jobId}) async {
     http.Response res;
     try {

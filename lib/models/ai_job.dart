@@ -142,16 +142,54 @@ class AssignedMerchantInfo {
   final String id;
   final String fullName;
   final String? avatar;
+  final String? cityName;
+  final String? provinceName;
+  final String? countryName;
+  final double? rating;
+  final int totalReviews;
 
-  const AssignedMerchantInfo({required this.id, required this.fullName, this.avatar});
+  const AssignedMerchantInfo({
+    required this.id,
+    required this.fullName,
+    this.avatar,
+    this.cityName,
+    this.provinceName,
+    this.countryName,
+    this.rating,
+    this.totalReviews = 0,
+  });
 
   factory AssignedMerchantInfo.fromJson(Map<String, dynamic> json) {
+    final company = json['Company'];
+    final city = company is Map<String, dynamic> ? company['City'] : null;
+    final province = company is Map<String, dynamic> ? company['Province'] : null;
+    final country = company is Map<String, dynamic> ? company['Country'] : null;
     return AssignedMerchantInfo(
       id: json['Id']?.toString() ?? '',
       fullName: json['FullName']?.toString() ?? 'Merchant',
       avatar: json['Avatar']?.toString(),
+      cityName: city is Map<String, dynamic> ? city['Name']?.toString() : null,
+      provinceName: province is Map<String, dynamic> ? province['Name']?.toString() : null,
+      countryName: country is Map<String, dynamic> ? country['Name']?.toString() : null,
+      rating: json['Rating'] is num ? (json['Rating'] as num).toDouble() : null,
+      totalReviews: json['TotalReviews'] is int
+          ? json['TotalReviews'] as int
+          : int.tryParse('${json['TotalReviews']}') ?? 0,
     );
   }
+
+  /// "Kota, Provinsi, Negara" — falls back gracefully when the merchant's
+  /// Company profile is incomplete.
+  String get locationLine {
+    final parts = [
+      if (cityName != null && cityName!.isNotEmpty) cityName,
+      if (provinceName != null && provinceName!.isNotEmpty) provinceName,
+      if (countryName != null && countryName!.isNotEmpty) countryName,
+    ];
+    return parts.isEmpty ? '-' : parts.join(', ');
+  }
+
+  bool get hasRating => rating != null && totalReviews > 0;
 }
 
 /// Full job detail returned by GET /ai/jobs/:id.
@@ -202,6 +240,24 @@ class AiJobDetail {
   }
 
   AiModel? get primaryModel => models.isEmpty ? null : models.first;
+
+  /// True when Stage 1 (mesh) finished but the automatic Stage 2 (color &
+  /// texture refine) that normally follows it failed to even start — the
+  /// job is done (`Status: SUCCEEDED`) but stuck as a colorless preview
+  /// forever unless someone manually retries via `POST /ai/jobs/:id/refine`.
+  ///
+  /// There's no separate "stage 2 succeeded" flag from the backend — both a
+  /// clean completion and a stuck one report the same overall `SUCCEEDED`
+  /// status, so this looks at the most recent "Stage 2" log entry instead:
+  /// if the latest one says the refine failed to start, nothing since has
+  /// superseded it.
+  bool get isStuckWithoutRefine {
+    if (status != AiJobStatus.succeeded) return false;
+    final stage2Logs = logs.where((l) => l.message.contains('Stage 2')).toList()
+      ..sort((a, b) => (a.createdAt ?? DateTime(0)).compareTo(b.createdAt ?? DateTime(0)));
+    if (stage2Logs.isEmpty) return false;
+    return stage2Logs.last.message.contains('creation failed');
+  }
 }
 
 /// One row from GET /ai/jobs — the authenticated user's job history.

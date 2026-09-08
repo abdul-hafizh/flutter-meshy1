@@ -17,6 +17,13 @@ import '../services/user_address_service.dart';
 import '../theme/app_theme.dart';
 import 'chat/chat_screen.dart';
 
+/// Caps a title at [maxLength] characters, appending "..." when it's longer
+/// — long AI prompts otherwise push the status pill off the header row.
+String _truncateTitle(String text, [int maxLength = 30]) {
+  if (text.length <= maxLength) return text;
+  return '${text.substring(0, maxLength)}...';
+}
+
 /// Renders inline inside the Pesanan tab (not pushed as its own route) so
 /// the app's bottom navigation bar stays visible while viewing a job.
 class JobDetailView extends StatefulWidget {
@@ -38,6 +45,7 @@ class JobDetailView extends StatefulWidget {
 class _JobDetailViewState extends State<JobDetailView> {
   bool _loading = true;
   bool _syncing = false;
+  bool _refining = false;
   String? _error;
   AiJobDetail? _detail;
 
@@ -219,6 +227,30 @@ class _JobDetailViewState extends State<JobDetailView> {
     }
   }
 
+  Future<void> _retryRefine() async {
+    final token = _token;
+    if (token == null) return;
+    setState(() => _refining = true);
+    try {
+      await AiJobService.refineJob(token: token, jobId: widget.jobId);
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Proses warna & tekstur dimulai ulang.')),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal memulai ulang. Coba lagi.')),
+      );
+    } finally {
+      if (mounted) setState(() => _refining = false);
+    }
+  }
+
   Future<void> _openFile(String? url) async {
     if (url == null) return;
     final uri = Uri.tryParse(url);
@@ -278,9 +310,11 @@ class _JobDetailViewState extends State<JobDetailView> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    detail.prompt?.isNotEmpty == true
-                                        ? detail.prompt!
-                                        : widget.promptFallback ?? 'Tanpa deskripsi',
+                                    _truncateTitle(
+                                      detail.prompt?.isNotEmpty == true
+                                          ? detail.prompt!
+                                          : widget.promptFallback ?? 'Tanpa deskripsi',
+                                    ),
                                     style: const TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.w800,
@@ -298,6 +332,10 @@ class _JobDetailViewState extends State<JobDetailView> {
                                 'Dihindari: ${detail.negativePrompt}',
                                 style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
                               ),
+                            ],
+                            if (detail.isStuckWithoutRefine) ...[
+                              const SizedBox(height: 12),
+                              _RefineRetryBanner(loading: _refining, onRetry: _retryRefine),
                             ],
                             const SizedBox(height: 20),
                             _ModelPreview(status: detail.status, model: detail.primaryModel),
@@ -456,6 +494,62 @@ class _ModelPreview extends StatelessWidget {
           Text(
             finished ? 'Model gagal dibuat' : 'AI sedang membuat model 3D-mu...',
             style: const TextStyle(fontSize: 13.5, color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown when Stage 2 (color & texture) failed to auto-start after the mesh
+/// preview finished — the model exists but stays colorless until someone
+/// retries it (see AiJobDetail.isStuckWithoutRefine).
+class _RefineRetryBanner extends StatelessWidget {
+  final bool loading;
+  final VoidCallback onRetry;
+
+  const _RefineRetryBanner({required this.loading, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.orangeDeep.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.orangeDeep.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.palette_outlined, size: 20, color: AppColors.orangeDeep),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'Pewarnaan & tekstur model gagal diproses otomatis.',
+              style: TextStyle(fontSize: 12.5, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: loading ? null : onRetry,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                child: loading
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text(
+                        'Coba Lagi',
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.orangeDeep),
+                      ),
+              ),
+            ),
           ),
         ],
       ),
@@ -702,11 +796,39 @@ class _AssignedMerchantCard extends StatelessWidget {
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 2),
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.textSecondary),
-                    SizedBox(width: 4),
-                    Text('Merchant terpilih', style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
+                    const Icon(Icons.place_outlined, size: 12, color: AppColors.textSecondary),
+                    const SizedBox(width: 3),
+                    Expanded(
+                      child: Text(
+                        merchant.locationLine,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    if (merchant.hasRating) ...[
+                      const Icon(Icons.star_rounded, size: 13, color: Color(0xFFF5A623)),
+                      const SizedBox(width: 2),
+                      Text(
+                        '${merchant.rating} · ${merchant.totalReviews} ulasan',
+                        style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                      ),
+                    ] else
+                      const Text(
+                        'Belum ada rating',
+                        style: TextStyle(fontSize: 11.5, color: AppColors.textFaint),
+                      ),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.textSecondary),
+                    const SizedBox(width: 4),
+                    const Text('Terpilih', style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
                   ],
                 ),
               ],
