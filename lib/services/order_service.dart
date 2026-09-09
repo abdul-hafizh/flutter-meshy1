@@ -76,6 +76,8 @@ class OrderService {
     required int packageWeightGrams,
     required int shippingCost,
     String? notes,
+    int? shippingMethodId,
+    int? shippingServiceId,
   }) async {
     http.Response res;
     try {
@@ -91,6 +93,8 @@ class OrderService {
               'PackageWeight': packageWeightGrams,
               'ShippingCost': shippingCost,
               if (notes != null && notes.trim().isNotEmpty) 'Notes': notes.trim(),
+              if (shippingMethodId != null) 'ShippingMethodId': shippingMethodId,
+              if (shippingServiceId != null) 'ShippingServiceId': shippingServiceId,
             }),
           )
           .timeout(const Duration(seconds: 30));

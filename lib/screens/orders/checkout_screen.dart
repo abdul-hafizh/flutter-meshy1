@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/payment_method.dart';
 import '../../models/physical_order.dart';
+import '../../models/shipping_catalog.dart';
 import '../../models/shipping_rate.dart';
 import '../../models/user_address.dart';
 import '../../providers/auth_controller.dart';
@@ -48,6 +49,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   List<ShippingRateOption> _rates = [];
   ShippingRateOption? _selectedRate;
 
+  List<ShippingMethodCategory> _catalog = [];
+  String? _selectedCategoryType;
+
   bool _submitting = false;
   String? _submitError;
 
@@ -87,6 +91,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _selectedAddress = addresses.firstWhere((a) => a.isDefault, orElse: () => addresses.first);
         }
       });
+
+      // Best-effort — without it, live rates just aren't grouped by
+      // category (everything falls under "Lainnya"), checkout still works.
+      try {
+        final catalog = await ShippingRateService.listCatalog(token: token);
+        if (mounted) setState(() => _catalog = catalog);
+      } catch (_) {
+        // ignore
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _loadError = e.message);
@@ -126,6 +139,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _ratesError = null;
       _rates = [];
       _selectedRate = null;
+      _selectedCategoryType = null;
     });
 
     try {
@@ -136,7 +150,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         packageWeightGrams: weight,
       );
       if (!mounted) return;
-      setState(() => _rates = rates);
+      final grouped = _groupRatesByCategory(rates);
+      setState(() {
+        _rates = rates;
+        _selectedCategoryType = grouped.isNotEmpty ? grouped.keys.first : null;
+      });
       if (rates.isEmpty) {
         setState(() => _ratesError = 'Tidak ada kurir yang tersedia untuk rute ini.');
       }
@@ -150,6 +168,38 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (mounted) setState(() => _checkingRates = false);
     }
   }
+
+  static const _otherCategoryKey = 'OTHER';
+  static const _categoryOrder = [
+    'INSTANT_SHIPMENT',
+    'REGULAR_SHIPMENT',
+    'REGULAR_CARGO_SHIPMENT',
+    'INTERNATIONAL_CARGO_SHIPMENT',
+    'INTERNAL_SHIPMENT',
+    _otherCategoryKey,
+  ];
+
+  /// Groups live Biteship rates by our shipping catalog's category — a rate
+  /// whose courier isn't in the catalog yet falls under "Lainnya" instead
+  /// of being dropped. Ordered Instant -> Regular -> Cargo -> International
+  /// -> Lainnya, matching how the categories read in the dashboard.
+  Map<String, List<ShippingRateOption>> _groupRatesByCategory(List<ShippingRateOption> rates) {
+    final map = <String, List<ShippingRateOption>>{};
+    for (final rate in rates) {
+      final key = matchRateToCatalog(rate, _catalog)?.method.shippingType ?? _otherCategoryKey;
+      map.putIfAbsent(key, () => []).add(rate);
+    }
+    final ordered = <String, List<ShippingRateOption>>{};
+    for (final key in _categoryOrder) {
+      if (map.containsKey(key)) ordered[key] = map[key]!;
+    }
+    for (final entry in map.entries) {
+      ordered.putIfAbsent(entry.key, () => entry.value);
+    }
+    return ordered;
+  }
+
+  String _categoryLabel(String key) => key == _otherCategoryKey ? 'Lainnya' : shippingCategoryLabel(key);
 
   bool get _canSubmit =>
       _selectedAddress != null &&
@@ -171,6 +221,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
 
     try {
+      final match = matchRateToCatalog(rate, _catalog);
       await OrderService.checkout(
         token: token,
         orderId: widget.order.id,
@@ -180,6 +231,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         courierServiceName: rate.courierServiceName,
         packageWeightGrams: int.tryParse(_weightCtrl.text.trim()) ?? 500,
         shippingCost: rate.price,
+        shippingMethodId: match?.method.id,
+        shippingServiceId: match?.service?.id,
       );
 
       final payment = await OrderPaymentService.createSnapToken(
@@ -293,10 +346,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ],
                       if (_rates.isNotEmpty) ...[
                         const SizedBox(height: 14),
+                        const _SectionTitle('Kategori Pengiriman'),
+                        const SizedBox(height: 10),
+                        _ShippingCategoryChips(
+                          categories: _groupRatesByCategory(_rates).keys.toList(),
+                          selected: _selectedCategoryType,
+                          labelOf: _categoryLabel,
+                          onSelect: (key) => setState(() => _selectedCategoryType = key),
+                        ),
+                        const SizedBox(height: 16),
                         const _SectionTitle('Pilih Kurir'),
                         const SizedBox(height: 10),
                         _ShippingRateList(
-                          rates: _rates,
+                          rates: _groupRatesByCategory(_rates)[_selectedCategoryType] ?? const [],
                           selected: _selectedRate,
                           onSelect: (r) => setState(() => _selectedRate = r),
                           rupiah: _rupiah,
@@ -446,6 +508,48 @@ class _AddressSection extends StatelessWidget {
                 TextButton(onPressed: onChange, child: const Text('Ganti')),
               ],
             ),
+    );
+  }
+}
+
+/// Category selector shown above the courier list — "Instan / Reguler /
+/// Kargo / Internasional / Lainnya", only the categories that actually have
+/// a live rate for this route/weight.
+class _ShippingCategoryChips extends StatelessWidget {
+  final List<String> categories;
+  final String? selected;
+  final String Function(String) labelOf;
+  final ValueChanged<String> onSelect;
+
+  const _ShippingCategoryChips({
+    required this.categories,
+    required this.selected,
+    required this.labelOf,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final key in categories)
+          ChoiceChip(
+            label: Text(labelOf(key)),
+            selected: key == selected,
+            onSelected: (_) => onSelect(key),
+            labelStyle: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: key == selected ? Colors.white : AppColors.textPrimary,
+            ),
+            selectedColor: AppColors.purple,
+            backgroundColor: AppColors.surface,
+            side: BorderSide(color: key == selected ? AppColors.purple : AppColors.border),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          ),
+      ],
     );
   }
 }
