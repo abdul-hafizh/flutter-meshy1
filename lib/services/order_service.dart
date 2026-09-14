@@ -106,6 +106,26 @@ class OrderService {
     return PhysicalOrder.fromJson(data['order'] as Map<String, dynamic>);
   }
 
+  /// Customer-initiated "Pesanan Diterima" — marks the order Completed and
+  /// stamps the shipment's DeliveredAt, unlocking the rating form. Distinct
+  /// from the merchant/system-driven status transitions elsewhere in the
+  /// order lifecycle (checkout, payment, tracking).
+  static Future<PhysicalOrder> confirmReceipt({
+    required String token,
+    required String orderId,
+  }) async {
+    http.Response res;
+    try {
+      res = await http
+          .post(_uri('/orders/$orderId/confirm-receipt'), headers: _headers(token))
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
+    }
+    final decoded = decodeApiResponse(res);
+    return PhysicalOrder.fromJson(decoded['data'] as Map<String, dynamic>);
+  }
+
   static Future<void> rate({
     required String token,
     required String orderId,

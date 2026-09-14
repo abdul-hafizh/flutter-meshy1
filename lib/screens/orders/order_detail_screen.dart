@@ -34,6 +34,7 @@ class _OrderDetailViewState extends State<OrderDetailView> {
 
   int _selectedRating = 0;
   bool _submittingRating = false;
+  bool _confirmingReceipt = false;
 
   // Polls while the order has no price yet, so the "menunggu konfirmasi
   // harga" banner clears on its own once the merchant quotes it. Kept
@@ -107,6 +108,48 @@ class _OrderDetailViewState extends State<OrderDetailView> {
       MaterialPageRoute(builder: (_) => CheckoutScreen(order: order)),
     );
     if (done == true) _load();
+  }
+
+  Future<void> _confirmReceipt() async {
+    final token = _token;
+    final order = _order;
+    if (token == null || order == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Konfirmasi Pesanan Diterima'),
+        content: const Text(
+          'Pastikan barang sudah kamu terima dalam kondisi baik. Setelah dikonfirmasi, pesanan akan ditandai selesai dan tidak bisa dibatalkan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Ya, Sudah Diterima'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _confirmingReceipt = true);
+    try {
+      final updated = await OrderService.confirmReceipt(token: token, orderId: order.id);
+      if (!mounted) return;
+      setState(() => _order = updated);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal mengonfirmasi pesanan. Coba lagi.')));
+    } finally {
+      if (mounted) setState(() => _confirmingReceipt = false);
+    }
   }
 
   Future<void> _submitRating() async {
@@ -202,6 +245,8 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                               onRatingChanged: (v) => setState(() => _selectedRating = v),
                               submittingRating: _submittingRating,
                               onSubmitRating: _submitRating,
+                              confirmingReceipt: _confirmingReceipt,
+                              onConfirmReceipt: _confirmReceipt,
                               rupiah: _rupiah,
                             ),
                             if (order.statusHistories.isNotEmpty) ...[
@@ -477,6 +522,8 @@ class _ActionArea extends StatelessWidget {
   final ValueChanged<int> onRatingChanged;
   final bool submittingRating;
   final VoidCallback onSubmitRating;
+  final bool confirmingReceipt;
+  final VoidCallback onConfirmReceipt;
   final String Function(int) rupiah;
 
   const _ActionArea({
@@ -486,6 +533,8 @@ class _ActionArea extends StatelessWidget {
     required this.onRatingChanged,
     required this.submittingRating,
     required this.onSubmitRating,
+    required this.confirmingReceipt,
+    required this.onConfirmReceipt,
     required this.rupiah,
   });
 
@@ -543,10 +592,19 @@ class _ActionArea extends StatelessWidget {
     }
 
     final shipment = order.primaryShipment;
+    final isCompleted = order.status?.isCompleted == true;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _ShipmentCard(shipment: shipment),
+        if (!isCompleted) ...[
+          const SizedBox(height: 14),
+          GradientButton(
+            label: confirmingReceipt ? 'Memproses...' : 'Pesanan Diterima',
+            icon: Icons.check_circle_outline_rounded,
+            onPressed: confirmingReceipt ? null : onConfirmReceipt,
+          ),
+        ],
         if (order.status?.isCompleted == true && order.rating == null) ...[
           const SizedBox(height: 14),
           Container(
