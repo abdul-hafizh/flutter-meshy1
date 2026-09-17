@@ -14,7 +14,8 @@
       "Read(//tmp/**)",
       "WebFetch(domain:biteship.com)",
       "Bash(curl -v --max-time 10 https://api.biteship.com/v1/couriers)",
-      "Bash(grep -E \"^\\(TONY|DROQUA|DEDDY|ADMIN\\)=\" /tmp/tokens2.sh)"
+      "Bash(grep -E \"^\\(TONY|DROQUA|DEDDY|ADMIN\\)=\" /tmp/tokens2.sh)",
+      "Bash(dart analyze *)"
     ]
   }
 }

@@ -274,10 +274,43 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return 'Rp $buf';
   }
 
+  Widget _priceRow(String label, String value, {bool bold = false, Color? valueColor}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
+              color: valueColor ?? AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final itemAmount = widget.order.totalAmount ?? 0;
+    final order = widget.order;
+    final itemAmount = order.totalAmount ?? 0;
     final totalAmount = itemAmount + (_selectedRate?.price ?? 0);
+    final subtotalAmount = order.subtotalAmount;
+    final discountAmount = order.discountAmount ?? 0;
+    final taxAmount = order.taxAmount;
+    final appFeeAmount = order.appFeeAmount;
+    final hasBreakdown = subtotalAmount != null;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -396,24 +429,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ),
                         child: Column(
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text('Harga Barang', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                                Text(_rupiah(itemAmount), style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text('Ongkos Kirim', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                                Text(
-                                  _selectedRate != null ? _rupiah(_selectedRate!.price) : '-',
-                                  style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                                ),
-                              ],
-                            ),
+                            if (hasBreakdown) ...[
+                              _priceRow('Harga Barang', _rupiah(subtotalAmount)),
+                              if (discountAmount > 0) _priceRow('Diskon Tier', '-${_rupiah(discountAmount)}', valueColor: const Color(0xFF1FAA59)),
+                              if (taxAmount != null) _priceRow('PPN', _rupiah(taxAmount)),
+                              if (appFeeAmount != null) _priceRow('Biaya Layanan Aplikasi', _rupiah(appFeeAmount)),
+                            ] else
+                              _priceRow('Harga Barang', _rupiah(itemAmount)),
+                            _priceRow('Ongkos Kirim', _selectedRate != null ? _rupiah(_selectedRate!.price) : '-'),
                             const Divider(height: 20, color: AppColors.border),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,

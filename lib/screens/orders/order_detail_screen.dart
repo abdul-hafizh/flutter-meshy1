@@ -538,6 +538,19 @@ class _ActionArea extends StatelessWidget {
     required this.rupiah,
   });
 
+  Widget _priceRow(String label, String value, {Color? valueColor}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+          Text(value, style: TextStyle(fontSize: 13, color: valueColor ?? AppColors.textPrimary)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!order.isPriced) {
@@ -564,6 +577,11 @@ class _ActionArea extends StatelessWidget {
     }
 
     if (!order.isPaid) {
+      final subtotalAmount = order.subtotalAmount;
+      final discountAmount = order.discountAmount ?? 0;
+      final taxAmount = order.taxAmount;
+      final appFeeAmount = order.appFeeAmount;
+      final hasBreakdown = subtotalAmount != null;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -574,13 +592,24 @@ class _ActionArea extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppColors.border),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
               children: [
-                const Text('Total Pesanan', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                Text(
-                  rupiah(order.totalAmount ?? 0),
-                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                if (hasBreakdown) ...[
+                  _priceRow('Harga Barang', rupiah(subtotalAmount)),
+                  if (discountAmount > 0) _priceRow('Diskon Tier', '-${rupiah(discountAmount)}', valueColor: const Color(0xFF1FAA59)),
+                  if (taxAmount != null) _priceRow('PPN', rupiah(taxAmount)),
+                  if (appFeeAmount != null) _priceRow('Biaya Layanan Aplikasi', rupiah(appFeeAmount)),
+                  const Divider(height: 20, color: AppColors.border),
+                ],
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Total Pesanan', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                    Text(
+                      rupiah(order.totalAmount ?? 0),
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                    ),
+                  ],
                 ),
               ],
             ),

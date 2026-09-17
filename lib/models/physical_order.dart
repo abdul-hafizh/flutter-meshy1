@@ -127,6 +127,7 @@ class ShipmentInfo {
   final String? courierCompany;
   final String? courierServiceName;
   final int? packageWeight;
+  final int? shippingCost;
   final String? trackingNumber;
   final String status;
   final DateTime? shippedAt;
@@ -137,6 +138,7 @@ class ShipmentInfo {
     this.courierCompany,
     this.courierServiceName,
     this.packageWeight,
+    this.shippingCost,
     this.trackingNumber,
     this.status = 'PENDING',
     this.shippedAt,
@@ -149,6 +151,7 @@ class ShipmentInfo {
       courierCompany: json['CourierCompany']?.toString(),
       courierServiceName: json['CourierServiceName']?.toString(),
       packageWeight: json['PackageWeight'] is int ? json['PackageWeight'] as int : int.tryParse('${json['PackageWeight']}'),
+      shippingCost: json['ShippingCost'] is int ? json['ShippingCost'] as int : int.tryParse('${json['ShippingCost']}'),
       trackingNumber: json['TrackingNumber']?.toString(),
       status: json['Status']?.toString() ?? 'PENDING',
       shippedAt: DateTime.tryParse(json['ShippedAt']?.toString() ?? ''),
@@ -188,6 +191,10 @@ class PhysicalOrder {
   final String? orderNumber;
   final OrderStatusInfo? status;
   final int? totalAmount;
+  final int? subtotalAmount;
+  final int? discountAmount;
+  final int? taxAmount;
+  final int? appFeeAmount;
   final String? notes;
   final int? rating;
   final String? ratingNotes;
@@ -204,6 +211,10 @@ class PhysicalOrder {
     this.orderNumber,
     this.status,
     this.totalAmount,
+    this.subtotalAmount,
+    this.discountAmount,
+    this.taxAmount,
+    this.appFeeAmount,
     this.notes,
     this.rating,
     this.ratingNotes,
@@ -222,6 +233,10 @@ class PhysicalOrder {
       orderNumber: json['OrderNumber']?.toString(),
       status: json['Status'] is Map<String, dynamic> ? OrderStatusInfo.fromJson(json['Status'] as Map<String, dynamic>) : null,
       totalAmount: json['TotalAmount'] is int ? json['TotalAmount'] as int : int.tryParse('${json['TotalAmount']}'),
+      subtotalAmount: json['SubtotalAmount'] is int ? json['SubtotalAmount'] as int : int.tryParse('${json['SubtotalAmount']}'),
+      discountAmount: json['DiscountAmount'] is int ? json['DiscountAmount'] as int : int.tryParse('${json['DiscountAmount']}'),
+      taxAmount: json['TaxAmount'] is int ? json['TaxAmount'] as int : int.tryParse('${json['TaxAmount']}'),
+      appFeeAmount: json['AppFeeAmount'] is int ? json['AppFeeAmount'] as int : int.tryParse('${json['AppFeeAmount']}'),
       notes: json['Notes']?.toString(),
       rating: json['Rating'] is int ? json['Rating'] as int : int.tryParse('${json['Rating']}'),
       ratingNotes: json['RatingNotes']?.toString(),

@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 
 import '../models/product.dart';
 import '../providers/auth_controller.dart';
+import '../providers/chat_controller.dart';
 import '../services/auth_service.dart' show ApiException;
 import '../services/api_config.dart';
+import '../services/chat_service.dart';
 import '../services/order_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/gradient_button.dart';
+import 'chat/chat_screen.dart';
 import 'orders/checkout_screen.dart';
 
 /// Product photo, seller, price, description and a quantity stepper — "Beli
@@ -26,6 +30,60 @@ class ProductDetailScreen extends StatefulWidget {
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _quantity = 1;
   bool _buying = false;
+  bool _openingChat = false;
+
+  Future<void> _chatWithSeller() async {
+    final sellerId = widget.product.sellerId;
+    if (sellerId == null || sellerId.isEmpty) return;
+    final token = context.read<AuthController>().token;
+    if (token == null) return;
+    setState(() => _openingChat = true);
+    try {
+      final client = await context.read<ChatController>().ensureConnected(token);
+      final info = await ChatService.createOrGetChannel(token: token, merchantId: sellerId);
+      final channel = client.channel(info.channelType, id: info.channelId);
+      if (channel.state == null) await channel.watch();
+      final product = widget.product;
+      // Avoid re-spamming the same product link every time the customer
+      // reopens this chat (e.g. just to check for a reply).
+      final alreadyShared = (channel.state?.messages ?? const []).any(
+        (m) => m.attachments.any((a) => a.type == 'PRODUCT_LINK' && a.extraData['productId'] == product.id),
+      );
+      if (!alreadyShared) {
+        await channel.sendMessage(
+          Message(
+            text: '🔗 Produk: ${product.productName}',
+            attachments: [
+              Attachment(
+                type: 'PRODUCT_LINK',
+                uploadState: const UploadState.success(),
+                extraData: {
+                  'productId': product.id,
+                  'productName': product.productName,
+                  'thumbnailPath': product.thumbnailPath,
+                  'price': product.price,
+                },
+              ),
+            ],
+          ),
+        );
+      }
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => ChatScreen(client: client, channel: channel)),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal membuka chat. Coba lagi.')),
+      );
+    } finally {
+      if (mounted) setState(() => _openingChat = false);
+    }
+  }
 
   Future<void> _buyNow() async {
     final token = context.read<AuthController>().token;
@@ -52,9 +110,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
+    final hasSeller = product.sellerId != null && product.sellerId!.isNotEmpty;
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Detail Produk')),
+      appBar: AppBar(
+        title: const Text('Detail Produk'),
+        actions: [
+          if (hasSeller)
+            IconButton(
+              onPressed: _openingChat ? null : _chatWithSeller,
+              icon: _openingChat
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.chat_bubble_outline_rounded),
+              tooltip: 'Chat Penjual',
+            ),
+        ],
+      ),
       body: SafeArea(
         top: false,
         child: ListView(
