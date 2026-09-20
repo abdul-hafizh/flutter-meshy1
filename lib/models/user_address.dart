@@ -16,6 +16,8 @@ class UserAddress {
   final ProvinceRef? province;
   final CityRef? city;
   final String? postalCode;
+  final double? latitude;
+  final double? longitude;
   final bool isDefault;
 
   const UserAddress({
@@ -32,6 +34,8 @@ class UserAddress {
     this.province,
     this.city,
     this.postalCode,
+    this.latitude,
+    this.longitude,
     this.isDefault = false,
   });
 
@@ -50,6 +54,8 @@ class UserAddress {
       province: json['Province'] is Map<String, dynamic> ? ProvinceRef.fromJson(json['Province'] as Map<String, dynamic>) : null,
       city: json['City'] is Map<String, dynamic> ? CityRef.fromJson(json['City'] as Map<String, dynamic>) : null,
       postalCode: json['PostalCode']?.toString(),
+      latitude: double.tryParse('${json['Latitude']}'),
+      longitude: double.tryParse('${json['Longitude']}'),
       isDefault: json['IsDefault'] == true || json['IsDefault'] == 1,
     );
   }

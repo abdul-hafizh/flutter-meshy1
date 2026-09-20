@@ -48,6 +48,7 @@ dependencies:
   mime: ^2.0.0
   webview_flutter: ^4.14.1
   stream_chat_flutter: ^10.3.0
+  geolocator: ^14.0.2
 
 dev_dependencies:
   flutter_test:

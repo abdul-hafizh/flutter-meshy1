@@ -31,6 +31,43 @@ class OrderService {
     return list.map((e) => PhysicalOrder.fromJson(e as Map<String, dynamic>)).toList();
   }
 
+  /// Per-tab badge counts (unpaid/packing/shipped/review/history), computed
+  /// server-side so they stay correct beyond the first page of orders.
+  static Future<Map<OrderTab, int>> counts({required String token}) async {
+    http.Response res;
+    try {
+      res = await http.get(_uri('/orders/counts'), headers: _headers(token)).timeout(const Duration(seconds: 20));
+    } catch (_) {
+      throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
+    }
+    final data = decodeApiResponse(res)['data'] as Map<String, dynamic>? ?? {};
+    int n(String k) => data[k] is int ? data[k] as int : int.tryParse('${data[k]}') ?? 0;
+    return {
+      OrderTab.unpaid: n('unpaid'),
+      OrderTab.packing: n('packing'),
+      OrderTab.shipped: n('shipped'),
+      OrderTab.review: n('review'),
+      OrderTab.history: n('history'),
+    };
+  }
+
+  /// Cancels an unpaid order (the backend refuses once it's been paid).
+  static Future<void> cancel({required String token, required String orderId, String? reason}) async {
+    http.Response res;
+    try {
+      res = await http
+          .post(
+            _uri('/orders/$orderId/cancel'),
+            headers: _headers(token),
+            body: jsonEncode({if (reason != null && reason.trim().isNotEmpty) 'Reason': reason.trim()}),
+          )
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
+    }
+    decodeApiResponse(res);
+  }
+
   static Future<PhysicalOrder> getById({required String token, required String orderId}) async {
     http.Response res;
     try {

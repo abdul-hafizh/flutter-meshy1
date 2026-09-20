@@ -20,12 +20,14 @@ class ProductService {
   static Future<List<Product>> listProducts({
     required String token,
     String? search,
+    String? sellerName,
     int? categoryId,
     bool? isPublished,
     int limit = 50,
   }) async {
     final query = <String, String>{'limit': '$limit'};
     if (search != null && search.trim().isNotEmpty) query['search'] = search.trim();
+    if (sellerName != null && sellerName.trim().isNotEmpty) query['sellerName'] = sellerName.trim();
     if (categoryId != null) query['categoryId'] = '$categoryId';
     if (isPublished != null) query['isPublished'] = isPublished.toString();
 

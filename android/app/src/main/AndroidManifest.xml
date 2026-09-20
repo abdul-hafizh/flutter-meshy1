@@ -3,6 +3,8 @@
          Debug/profile builds get this injected automatically by Flutter's
          tooling, but release builds only get what's declared here. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <application
         android:label="flutter_meshy1"
         android:name="${applicationName}"

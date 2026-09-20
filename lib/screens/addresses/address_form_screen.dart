@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/region.dart';
@@ -28,6 +29,9 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
   late final TextEditingController _addressCtrl;
   late final TextEditingController _postalCodeCtrl;
   late bool _isDefault;
+  double? _latitude;
+  double? _longitude;
+  bool _locating = false;
 
   List<CountryRef> _countries = [];
   List<ProvinceRef> _provinces = [];
@@ -51,6 +55,8 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     _addressCtrl = TextEditingController(text: existing?.address ?? '');
     _postalCodeCtrl = TextEditingController(text: existing?.postalCode ?? '');
     _isDefault = existing?.isDefault ?? false;
+    _latitude = existing?.latitude;
+    _longitude = existing?.longitude;
     _countryId = existing?.countryId;
     _provinceId = existing?.provinceId;
     _cityId = existing?.cityId;
@@ -133,6 +139,38 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     }
   }
 
+  Future<void> _useCurrentLocation() async {
+    setState(() {
+      _locating = true;
+      _error = null;
+    });
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        throw 'Aktifkan layanan lokasi (GPS) di perangkat kamu.';
+      }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        throw 'Izin lokasi ditolak. Aktifkan izin lokasi untuk aplikasi ini di pengaturan.';
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      ).timeout(const Duration(seconds: 20));
+      if (!mounted) return;
+      setState(() {
+        _latitude = pos.latitude;
+        _longitude = pos.longitude;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e is String ? e : 'Gagal mengambil lokasi. Coba lagi.');
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     final token = _token;
@@ -157,6 +195,8 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
           provinceId: _provinceId,
           cityId: _cityId,
           postalCode: _postalCodeCtrl.text.trim(),
+          latitude: _latitude,
+          longitude: _longitude,
           isDefault: _isDefault,
         );
       } else {
@@ -172,6 +212,8 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
           provinceId: _provinceId,
           cityId: _cityId,
           postalCode: _postalCodeCtrl.text.trim(),
+          latitude: _latitude,
+          longitude: _longitude,
           isDefault: _isDefault,
         );
       }
@@ -283,6 +325,28 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                 controller: _postalCodeCtrl,
                 keyboardType: TextInputType.number,
                 decoration: _decoration('Kode pos (opsional)'),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _locating ? null : _useCurrentLocation,
+                icon: _locating
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Icon(_latitude != null ? Icons.location_on_rounded : Icons.my_location_rounded, size: 18),
+                label: Text(_latitude != null ? 'Titik lokasi tersimpan — perbarui' : 'Gunakan lokasi saya sekarang'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  side: const BorderSide(color: AppColors.purple),
+                  foregroundColor: AppColors.purple,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  minimumSize: const Size(double.infinity, 0),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Text(
+                  'Titik lokasi dibutuhkan agar kurir instan (Gojek, Grab, dll.) muncul saat cek ongkir. Lakukan saat kamu berada di alamat pengiriman.',
+                  style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                ),
               ),
               const SizedBox(height: 8),
               SwitchListTile(

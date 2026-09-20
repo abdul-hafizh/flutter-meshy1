@@ -35,6 +35,7 @@ class _OrderDetailViewState extends State<OrderDetailView> {
   int _selectedRating = 0;
   bool _submittingRating = false;
   bool _confirmingReceipt = false;
+  bool _cancelling = false;
 
   // Polls while the order has no price yet, so the "menunggu konfirmasi
   // harga" banner clears on its own once the merchant quotes it. Kept
@@ -152,6 +153,38 @@ class _OrderDetailViewState extends State<OrderDetailView> {
     }
   }
 
+  Future<void> _cancelOrder() async {
+    final token = _token;
+    final order = _order;
+    if (token == null || order == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Batalkan pesanan?'),
+        content: const Text('Pesanan yang dibatalkan tidak bisa dipulihkan.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Tidak')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Ya, Batalkan')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _cancelling = true);
+    try {
+      await OrderService.cancel(token: token, orderId: order.id);
+      await _load();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal membatalkan pesanan. Coba lagi.')));
+    } finally {
+      if (mounted) setState(() => _cancelling = false);
+    }
+  }
+
   Future<void> _submitRating() async {
     final token = _token;
     final order = _order;
@@ -247,6 +280,8 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                               onSubmitRating: _submitRating,
                               confirmingReceipt: _confirmingReceipt,
                               onConfirmReceipt: _confirmReceipt,
+                              cancelling: _cancelling,
+                              onCancel: _cancelOrder,
                               rupiah: _rupiah,
                             ),
                             if (order.statusHistories.isNotEmpty) ...[
@@ -524,6 +559,8 @@ class _ActionArea extends StatelessWidget {
   final VoidCallback onSubmitRating;
   final bool confirmingReceipt;
   final VoidCallback onConfirmReceipt;
+  final bool cancelling;
+  final VoidCallback onCancel;
   final String Function(int) rupiah;
 
   const _ActionArea({
@@ -535,8 +572,25 @@ class _ActionArea extends StatelessWidget {
     required this.onSubmitRating,
     required this.confirmingReceipt,
     required this.onConfirmReceipt,
+    required this.cancelling,
+    required this.onCancel,
     required this.rupiah,
   });
+
+  Widget _cancelButton() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Center(
+        child: TextButton(
+          onPressed: cancelling ? null : onCancel,
+          child: Text(
+            cancelling ? 'Membatalkan...' : 'Batalkan Pesanan',
+            style: const TextStyle(color: Color(0xFFE0453A), fontWeight: FontWeight.w700),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _priceRow(String label, String value, {Color? valueColor}) {
     return Padding(
@@ -553,21 +607,20 @@ class _ActionArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!order.isPriced) {
+    if (order.isCancelled) {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppColors.orange.withValues(alpha: 0.1),
+          color: const Color(0xFFE0453A).withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.orange.withValues(alpha: 0.25)),
         ),
-        child: Row(
+        child: const Row(
           children: [
-            const Icon(Icons.hourglass_top_rounded, size: 20, color: AppColors.orange),
-            const SizedBox(width: 12),
-            const Expanded(
+            Icon(Icons.cancel_outlined, size: 20, color: Color(0xFFE0453A)),
+            SizedBox(width: 12),
+            Expanded(
               child: Text(
-                'Menunggu konfirmasi harga dari penjual. Halaman ini akan otomatis diperbarui.',
+                'Pesanan ini telah dibatalkan.',
                 style: TextStyle(fontSize: 12.5, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
               ),
             ),
@@ -576,6 +629,39 @@ class _ActionArea extends StatelessWidget {
       );
     }
 
+    if (!order.isPriced) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _awaitingPriceBanner(),
+        _cancelButton(),
+      ]);
+    }
+    return _buildPricedArea(context);
+  }
+
+  Widget _awaitingPriceBanner() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.orange.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.orange.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.hourglass_top_rounded, size: 20, color: AppColors.orange),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Menunggu konfirmasi harga dari penjual. Halaman ini akan otomatis diperbarui.',
+              style: TextStyle(fontSize: 12.5, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPricedArea(BuildContext context) {
     if (!order.isPaid) {
       final subtotalAmount = order.subtotalAmount;
       final discountAmount = order.discountAmount ?? 0;
@@ -616,6 +702,7 @@ class _ActionArea extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           GradientButton(label: 'Lengkapi Pesanan', icon: Icons.arrow_forward_rounded, onPressed: onCheckout),
+          _cancelButton(),
         ],
       );
     }

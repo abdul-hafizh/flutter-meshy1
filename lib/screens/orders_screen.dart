@@ -40,6 +40,24 @@ class OrdersScreenState extends State<OrdersScreen> {
   bool _ordersLoadedOnce = false;
   List<PhysicalOrder> _physicalOrders = [];
   String? _selectedOrderId;
+  // null = every physical order; otherwise only that Shopee-style tab.
+  OrderTab? _physicalFilter;
+
+  // Server-side badge counts; falls back to counting the loaded list.
+  Map<OrderTab, int>? _serverCounts;
+
+  int _countFor(OrderTab tab) => _serverCounts?[tab] ?? _physicalOrders.where((o) => o.tab == tab).length;
+
+  List<PhysicalOrder> get _visiblePhysicalOrders {
+    final filter = _physicalFilter;
+    if (filter == null) return _physicalOrders;
+    if (filter == OrderTab.history) return _physicalOrders.where((o) => o.isCompleted || o.isCancelled).toList();
+    return _physicalOrders.where((o) => o.tab == filter).toList();
+  }
+
+  void _toggleFilter(OrderTab tab) {
+    setState(() => _physicalFilter = _physicalFilter == tab ? null : tab);
+  }
 
   // Polls Meshy for progress on any still-processing job so the list updates
   // on its own — no more manually tapping refresh. Only ever scheduled while
@@ -75,6 +93,12 @@ class OrdersScreenState extends State<OrdersScreen> {
       final orders = await OrderService.listMine(token: token);
       if (!mounted) return;
       setState(() => _physicalOrders = orders);
+      try {
+        final counts = await OrderService.counts(token: token);
+        if (mounted) setState(() => _serverCounts = counts);
+      } catch (_) {
+        // Badges fall back to counting the loaded list.
+      }
     } catch (_) {
       // Best-effort — keep whatever list was already showing.
     } finally {
@@ -268,23 +292,163 @@ class OrdersScreenState extends State<OrdersScreen> {
                   if (job != filtered.last) const SizedBox(height: 12),
                 ],
             ] else ...[
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Status Pesanan',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => _toggleFilter(OrderTab.history),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Lihat Riwayat Pesanan',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: _physicalFilter == OrderTab.history ? AppColors.purple : AppColors.textSecondary,
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textFaint),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _StatusShortcut(
+                    icon: Icons.account_balance_wallet_outlined,
+                    label: 'Belum Bayar',
+                    count: _countFor(OrderTab.unpaid),
+                    active: _physicalFilter == OrderTab.unpaid,
+                    onTap: () => _toggleFilter(OrderTab.unpaid),
+                  ),
+                  _StatusShortcut(
+                    icon: Icons.inventory_2_outlined,
+                    label: 'Dikemas',
+                    count: _countFor(OrderTab.packing),
+                    active: _physicalFilter == OrderTab.packing,
+                    onTap: () => _toggleFilter(OrderTab.packing),
+                  ),
+                  _StatusShortcut(
+                    icon: Icons.local_shipping_outlined,
+                    label: 'Dikirim',
+                    count: _countFor(OrderTab.shipped),
+                    active: _physicalFilter == OrderTab.shipped,
+                    onTap: () => _toggleFilter(OrderTab.shipped),
+                  ),
+                  _StatusShortcut(
+                    icon: Icons.star_border_rounded,
+                    label: 'Beri Penilaian',
+                    count: _countFor(OrderTab.review),
+                    active: _physicalFilter == OrderTab.review,
+                    onTap: () => _toggleFilter(OrderTab.review),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
               if (_ordersLoading)
                 const Padding(
                   padding: EdgeInsets.only(top: 40),
                   child: Center(child: CircularProgressIndicator()),
                 )
-              else if (_physicalOrders.isEmpty)
-                const _PhysicalEmptyState()
+              else if (_visiblePhysicalOrders.isEmpty)
+                _physicalOrders.isEmpty
+                    ? const _PhysicalEmptyState()
+                    : const Padding(
+                        padding: EdgeInsets.only(top: 40),
+                        child: Center(
+                          child: Text(
+                            'Tidak ada pesanan pada status ini.',
+                            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                          ),
+                        ),
+                      )
               else
-                for (final order in _physicalOrders) ...[
+                for (final order in _visiblePhysicalOrders) ...[
                   _PhysicalOrderCard(
                     order: order,
                     onTap: () => setState(() => _selectedOrderId = order.id),
                   ),
-                  if (order != _physicalOrders.last) const SizedBox(height: 12),
+                  if (order != _visiblePhysicalOrders.last) const SizedBox(height: 12),
                 ],
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One of the four Shopee-style status shortcuts (icon + label + red count
+/// badge) at the top of the physical-orders view.
+class _StatusShortcut extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final int count;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _StatusShortcut({
+    required this.icon,
+    required this.label,
+    required this.count,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = active ? AppColors.purple : AppColors.textPrimary;
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(icon, size: 30, color: color),
+                  if (count > 0)
+                    Positioned(
+                      right: -10,
+                      top: -6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        constraints: const BoxConstraints(minWidth: 18),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEE4D2D),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.background, width: 1.5),
+                        ),
+                        child: Text(
+                          count > 99 ? '99+' : '$count',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11.5, fontWeight: active ? FontWeight.w800 : FontWeight.w600, color: color),
+              ),
+            ],
+          ),
         ),
       ),
     );

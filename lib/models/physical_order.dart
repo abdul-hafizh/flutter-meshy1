@@ -183,6 +183,8 @@ class PaymentInfo {
   bool get isPaid => status == 'PAID';
 }
 
+enum OrderTab { unpaid, packing, shipped, review, history }
+
 /// A physical 3D-print order (`Orders` on the backend, excluding
 /// AI-credit purchases). Distinct from an [AiJobSummary] — an order only
 /// exists once the customer has picked a merchant for a finished job.
@@ -261,4 +263,22 @@ class PhysicalOrder {
   bool get isPaid => payments.any((p) => p.isPaid);
 
   ShipmentInfo? get primaryShipment => shipments.isEmpty ? null : shipments.first;
+
+  bool get isCompleted => status?.isCompleted == true;
+
+  bool get isCancelled => status?.name.toUpperCase() == 'CANCELLED';
+
+  /// Customer-facing tab this order belongs to (Shopee-style shortcuts on the
+  /// Pesanan screen). Completed orders land in [OrderTab.review] until rated,
+  /// then only appear under the history view.
+  OrderTab get tab {
+    if (isCancelled) return OrderTab.history;
+    if (isCompleted) return rating == null ? OrderTab.review : OrderTab.history;
+    if (!isPaid) return OrderTab.unpaid;
+    final shipmentStatus = primaryShipment?.status.toUpperCase();
+    if (shipmentStatus == 'SHIPPED' || shipmentStatus == 'IN_TRANSIT' || shipmentStatus == 'DELIVERED') {
+      return OrderTab.shipped;
+    }
+    return OrderTab.packing;
+  }
 }

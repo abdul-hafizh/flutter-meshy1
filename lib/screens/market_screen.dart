@@ -21,6 +21,7 @@ class MarketScreen extends StatefulWidget {
 
 class _MarketScreenState extends State<MarketScreen> {
   final _searchController = TextEditingController();
+  final _storeController = TextEditingController();
   Timer? _debounce;
 
   List<ProductCategoryOption> _categories = [];
@@ -43,6 +44,7 @@ class _MarketScreenState extends State<MarketScreen> {
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
+    _storeController.dispose();
     super.dispose();
   }
 
@@ -72,6 +74,7 @@ class _MarketScreenState extends State<MarketScreen> {
         token: token,
         isPublished: true,
         search: _searchController.text,
+        sellerName: _storeController.text,
         categoryId: _selectedCategoryId,
         limit: 50,
       );
@@ -142,6 +145,34 @@ class _MarketScreenState extends State<MarketScreen> {
                         contentPadding: EdgeInsets.symmetric(vertical: 14),
                         border: InputBorder.none,
                         hintText: 'Cari produk...',
+                        hintStyle: TextStyle(fontSize: 14, color: AppColors.textFaint),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceMuted,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.storefront_outlined, size: 20, color: AppColors.textFaint),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: _storeController,
+                      onChanged: _onSearchChanged,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(vertical: 14),
+                        border: InputBorder.none,
+                        hintText: 'Filter nama toko...',
                         hintStyle: TextStyle(fontSize: 14, color: AppColors.textFaint),
                       ),
                     ),

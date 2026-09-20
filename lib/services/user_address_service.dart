@@ -41,6 +41,8 @@ class UserAddressService {
     int? provinceId,
     int? cityId,
     String? postalCode,
+    double? latitude,
+    double? longitude,
     bool? isDefault,
   }) {
     return {
@@ -53,6 +55,8 @@ class UserAddressService {
       if (provinceId != null) 'ProvinceId': provinceId,
       if (cityId != null) 'CityId': cityId,
       if (postalCode != null) 'PostalCode': postalCode,
+      if (latitude != null) 'Latitude': latitude,
+      if (longitude != null) 'Longitude': longitude,
       if (isDefault != null) 'IsDefault': isDefault,
     };
   }
@@ -68,6 +72,8 @@ class UserAddressService {
     int? provinceId,
     int? cityId,
     String? postalCode,
+    double? latitude,
+    double? longitude,
     bool isDefault = false,
   }) async {
     http.Response res;
@@ -86,6 +92,8 @@ class UserAddressService {
               provinceId: provinceId,
               cityId: cityId,
               postalCode: postalCode,
+              latitude: latitude,
+              longitude: longitude,
               isDefault: isDefault,
             )),
           )
@@ -109,6 +117,8 @@ class UserAddressService {
     int? provinceId,
     int? cityId,
     String? postalCode,
+    double? latitude,
+    double? longitude,
     bool? isDefault,
   }) async {
     http.Response res;
@@ -127,6 +137,8 @@ class UserAddressService {
               provinceId: provinceId,
               cityId: cityId,
               postalCode: postalCode,
+              latitude: latitude,
+              longitude: longitude,
               isDefault: isDefault,
             )),
           )
