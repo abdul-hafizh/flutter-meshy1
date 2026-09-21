@@ -1,4 +1,4 @@
-package com.example.flutter_meshy1
+package com.petope.app
 
 import io.flutter.embedding.android.FlutterActivity
 
