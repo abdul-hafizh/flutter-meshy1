@@ -8,6 +8,7 @@ import '../services/auth_service.dart' show ApiException;
 import '../theme/app_theme.dart';
 import '../widgets/gradient_button.dart';
 import 'payment_webview_screen.dart';
+import 'token_history_screen.dart';
 
 class BuyTokensScreen extends StatefulWidget {
   const BuyTokensScreen({super.key});
@@ -65,6 +66,15 @@ class _BuyTokensScreenState extends State<BuyTokensScreen> {
         title: const Text('Beli Token AI'),
         backgroundColor: AppColors.surface,
         elevation: 0,
+        actions: [
+          TextButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const TokenHistoryScreen()),
+            ),
+            icon: const Icon(Icons.history_rounded, size: 18),
+            label: const Text('Riwayat'),
+          ),
+        ],
       ),
       body: SafeArea(
         top: false,

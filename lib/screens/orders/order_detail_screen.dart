@@ -8,6 +8,7 @@ import '../../models/physical_order.dart';
 import '../../providers/auth_controller.dart';
 import '../../services/api_config.dart';
 import '../../services/auth_service.dart' show ApiException;
+import '../../services/invoice_service.dart';
 import '../../services/order_service.dart';
 import '../../services/shipment_tracking_service.dart';
 import '../../theme/app_theme.dart';
@@ -33,7 +34,9 @@ class _OrderDetailViewState extends State<OrderDetailView> {
   PhysicalOrder? _order;
 
   int _selectedRating = 0;
+  final _ratingCommentController = TextEditingController();
   bool _submittingRating = false;
+  bool _openingInvoice = false;
   bool _confirmingReceipt = false;
   bool _cancelling = false;
 
@@ -55,6 +58,7 @@ class _OrderDetailViewState extends State<OrderDetailView> {
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _ratingCommentController.dispose();
     super.dispose();
   }
 
@@ -191,7 +195,12 @@ class _OrderDetailViewState extends State<OrderDetailView> {
     if (token == null || order == null || _selectedRating == 0) return;
     setState(() => _submittingRating = true);
     try {
-      await OrderService.rate(token: token, orderId: order.id, rating: _selectedRating);
+      await OrderService.rate(
+        token: token,
+        orderId: order.id,
+        rating: _selectedRating,
+        ratingNotes: _ratingCommentController.text,
+      );
       await _load();
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -201,6 +210,24 @@ class _OrderDetailViewState extends State<OrderDetailView> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal mengirim penilaian. Coba lagi.')));
     } finally {
       if (mounted) setState(() => _submittingRating = false);
+    }
+  }
+
+  Future<void> _openInvoice() async {
+    final token = _token;
+    final order = _order;
+    if (token == null || order == null) return;
+    setState(() => _openingInvoice = true);
+    try {
+      await InvoiceService.open(token: token, orderId: order.id);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal membuka invoice. Coba lagi.')));
+    } finally {
+      if (mounted) setState(() => _openingInvoice = false);
     }
   }
 
@@ -270,11 +297,22 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                               const SizedBox(height: 14),
                               _MerchantCard(merchant: order.merchant!),
                             ],
+                            if (order.isPaid) ...[
+                              const SizedBox(height: 14),
+                              OutlinedButton.icon(
+                                onPressed: _openingInvoice ? null : _openInvoice,
+                                icon: _openingInvoice
+                                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                    : const Icon(Icons.receipt_long_rounded, size: 18),
+                                label: Text(_openingInvoice ? 'Membuka...' : 'Unduh Invoice'),
+                              ),
+                            ],
                             const SizedBox(height: 18),
                             _ActionArea(
                               order: order,
                               onCheckout: _openCheckout,
                               selectedRating: _selectedRating,
+                              ratingCommentController: _ratingCommentController,
                               onRatingChanged: (v) => setState(() => _selectedRating = v),
                               submittingRating: _submittingRating,
                               onSubmitRating: _submitRating,
@@ -554,6 +592,7 @@ class _ActionArea extends StatelessWidget {
   final PhysicalOrder order;
   final VoidCallback onCheckout;
   final int selectedRating;
+  final TextEditingController ratingCommentController;
   final ValueChanged<int> onRatingChanged;
   final bool submittingRating;
   final VoidCallback onSubmitRating;
@@ -567,6 +606,7 @@ class _ActionArea extends StatelessWidget {
     required this.order,
     required this.onCheckout,
     required this.selectedRating,
+    required this.ratingCommentController,
     required this.onRatingChanged,
     required this.submittingRating,
     required this.onSubmitRating,
@@ -750,6 +790,31 @@ class _ActionArea extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
+                TextField(
+                  controller: ratingCommentController,
+                  maxLines: 3,
+                  maxLength: 255,
+                  textCapitalization: TextCapitalization.sentences,
+                  style: const TextStyle(fontSize: 13.5),
+                  decoration: InputDecoration(
+                    hintText: 'Tulis komentar tentang pesananmu (opsional)',
+                    hintStyle: const TextStyle(fontSize: 13, color: AppColors.textFaint),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.purple),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
                 GradientButton(
                   label: submittingRating ? 'Mengirim...' : 'Kirim Penilaian',
                   height: 46,
@@ -766,6 +831,13 @@ class _ActionArea extends StatelessWidget {
                 Icon(i <= order.rating! ? Icons.star_rounded : Icons.star_outline_rounded, color: AppColors.orange, size: 20),
             ],
           ),
+          if (order.ratingNotes?.trim().isNotEmpty == true) ...[
+            const SizedBox(height: 6),
+            Text(
+              order.ratingNotes!.trim(),
+              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+          ],
         ],
       ],
     );
