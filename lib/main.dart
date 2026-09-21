@@ -26,7 +26,7 @@ class SnapyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ChatController()),
       ],
       child: MaterialApp(
-        title: 'Snapy AI 3D',
+        title: 'Petope',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         home: const AuthGate(),
