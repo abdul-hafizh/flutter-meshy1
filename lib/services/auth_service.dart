@@ -91,6 +91,39 @@ class AuthService {
     return AppUser.fromJson(decoded['data'] as Map<String, dynamic>);
   }
 
+  /// Updates the logged-in user's own profile (`PUT /auth/me`) and returns
+  /// the fresh [AppUser]. `null` leaves a field unchanged server-side.
+  static Future<AppUser> updateProfile({
+    required String token,
+    String? fullName,
+    String? phone,
+    String? whatsappNumber,
+  }) async {
+    http.Response res;
+    try {
+      res = await http
+          .put(
+            _uri('/auth/me'),
+            headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+            body: jsonEncode({
+              if (fullName != null) 'FullName': fullName,
+              if (phone != null) 'Phone': phone,
+              if (whatsappNumber != null) 'WhatsappNumber': whatsappNumber,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+    } catch (_) {
+      throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
+    }
+
+    try {
+      final decoded = decodeApiResponse(res);
+      return AppUser.fromJson(decoded['data'] as Map<String, dynamic>);
+    } on ApiException catch (e) {
+      throw ApiException(_friendlyMessage(e.message));
+    }
+  }
+
   /// Re-fetches the current user (including their up-to-date AI credit
   /// balance) — the cached [AppUser] is only ever refreshed at login/
   /// register time otherwise, so callers should use this after anything

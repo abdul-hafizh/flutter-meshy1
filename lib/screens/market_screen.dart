@@ -20,15 +20,21 @@ class MarketScreen extends StatefulWidget {
 }
 
 class _MarketScreenState extends State<MarketScreen> {
+  static const _pageSize = 10;
+
   final _searchController = TextEditingController();
   final _storeController = TextEditingController();
+  final _scrollController = ScrollController();
   Timer? _debounce;
 
   List<ProductCategoryOption> _categories = [];
   int? _selectedCategoryId;
 
   List<Product>? _products;
+  int _page = 1;
+  bool _hasMore = false;
   bool _loading = true;
+  bool _loadingMore = false;
   String? _error;
 
   @override
@@ -41,11 +47,27 @@ class _MarketScreenState extends State<MarketScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     _debounce?.cancel();
     _searchController.dispose();
     _storeController.dispose();
     super.dispose();
+  }
+
+  // Fires while scrolling; requests the next page a bit before the user
+  // actually hits the bottom so the spinner is already there when they do.
+  void _onScroll() {
+    if (!_hasMore || _loading || _loadingMore) return;
+    if (_scrollController.position.pixels < _scrollController.position.maxScrollExtent - 300) return;
+    _loadMore();
   }
 
   String? get _token => context.read<AuthController>().token;
@@ -70,17 +92,20 @@ class _MarketScreenState extends State<MarketScreen> {
       _error = null;
     });
     try {
-      final products = await ProductService.listProducts(
+      final result = await ProductService.listProducts(
         token: token,
         isPublished: true,
         search: _searchController.text,
         sellerName: _storeController.text,
         categoryId: _selectedCategoryId,
-        limit: 50,
+        page: 1,
+        limit: _pageSize,
       );
       if (!mounted) return;
       setState(() {
-        _products = products;
+        _products = result.items;
+        _page = 1;
+        _hasMore = result.hasMore;
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -89,6 +114,33 @@ class _MarketScreenState extends State<MarketScreen> {
         _error = e.message;
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    final token = _token;
+    if (token == null) return;
+    setState(() => _loadingMore = true);
+    try {
+      final result = await ProductService.listProducts(
+        token: token,
+        isPublished: true,
+        search: _searchController.text,
+        sellerName: _storeController.text,
+        categoryId: _selectedCategoryId,
+        page: _page + 1,
+        limit: _pageSize,
+      );
+      if (!mounted) return;
+      setState(() {
+        _products = [...?_products, ...result.items];
+        _page += 1;
+        _hasMore = result.hasMore;
+      });
+    } on ApiException catch (_) {
+      // Best-effort — the scroll listener will simply retry on the next tick.
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
     }
   }
 
@@ -109,6 +161,7 @@ class _MarketScreenState extends State<MarketScreen> {
       child: RefreshIndicator(
         onRefresh: _loadProducts,
         child: ListView(
+          controller: _scrollController,
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           children: [
             const Text(
@@ -252,6 +305,11 @@ class _MarketScreenState extends State<MarketScreen> {
                     ),
                   );
                 },
+              ),
+            if (_loadingMore)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(child: CircularProgressIndicator()),
               ),
           ],
         ),

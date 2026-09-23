@@ -35,6 +35,7 @@ class CreateScreen extends StatefulWidget {
 class _CreateScreenState extends State<CreateScreen> {
   final TextEditingController _controller = TextEditingController();
   final TextEditingController _negativeController = TextEditingController();
+  final TextEditingController _noteController = TextEditingController();
   final TextEditingController _lengthController = TextEditingController();
   final TextEditingController _widthController = TextEditingController();
   final TextEditingController _heightController = TextEditingController();
@@ -63,6 +64,7 @@ class _CreateScreenState extends State<CreateScreen> {
   void dispose() {
     _controller.dispose();
     _negativeController.dispose();
+    _noteController.dispose();
     _lengthController.dispose();
     _widthController.dispose();
     _heightController.dispose();
@@ -134,6 +136,7 @@ class _CreateScreenState extends State<CreateScreen> {
           prompt: _controller.text.trim(),
           artStyle: _artStyle,
           negativePrompt: _negativeController.text,
+          note: _noteController.text,
           length: targetLength,
           width: targetWidth,
           height: targetHeight,
@@ -152,6 +155,7 @@ class _CreateScreenState extends State<CreateScreen> {
           prompt: _controller.text.trim().isEmpty ? null : _controller.text.trim(),
           artStyle: _artStyle,
           negativePrompt: _negativeController.text,
+          note: _noteController.text,
           length: targetLength,
           width: targetWidth,
           height: targetHeight,
@@ -160,6 +164,7 @@ class _CreateScreenState extends State<CreateScreen> {
       if (!mounted) return;
       _controller.clear();
       _negativeController.clear();
+      _noteController.clear();
       _lengthController.clear();
       _widthController.clear();
       _heightController.clear();
@@ -352,6 +357,40 @@ class _CreateScreenState extends State<CreateScreen> {
                 child: _DimensionField(label: 'Tinggi', controller: _heightController),
               ),
             ],
+          ),
+          const SizedBox(height: 22),
+          const Text(
+            'Catatan untuk Merchant (opsional)',
+            style: TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Sampaikan permintaan khusus, misalnya warna atau finishing yang kamu mau',
+            style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: TextField(
+              controller: _noteController,
+              minLines: 2,
+              maxLines: 4,
+              style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+              decoration: const InputDecoration(
+                contentPadding: EdgeInsets.all(16),
+                border: InputBorder.none,
+                hintText: 'Contoh: tolong warna gold, cetak lebih tebal di bagian kaki...',
+                hintStyle: TextStyle(fontSize: 13.5, color: AppColors.textFaint, height: 1.4),
+              ),
+            ),
           ),
           const SizedBox(height: 24),
           const Text(

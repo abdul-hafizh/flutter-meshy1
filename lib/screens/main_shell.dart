@@ -26,7 +26,7 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     final screens = [
-      HomeScreen(onCreateTap: () => _goTo(1)),
+      HomeScreen(onCreateTap: () => _goTo(1), onSeeAllTap: () => _goTo(2)),
       CreateScreen(onCreated: () => _goTo(3)),
       const MarketScreen(),
       OrdersScreen(key: _ordersKey),

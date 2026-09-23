@@ -55,6 +55,7 @@ class AiJobService {
     required String prompt,
     String artStyle = 'realistic',
     String? negativePrompt,
+    String? note,
     double? length,
     double? width,
     double? height,
@@ -70,6 +71,7 @@ class AiJobService {
               'artStyle': artStyle,
               if (negativePrompt != null && negativePrompt.trim().isNotEmpty)
                 'negativePrompt': negativePrompt.trim(),
+              if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
               if (length != null) 'TargetLength': length,
               if (width != null) 'TargetWidth': width,
               if (height != null) 'TargetHeight': height,
@@ -99,6 +101,7 @@ class AiJobService {
     String? prompt,
     String artStyle = 'realistic',
     String? negativePrompt,
+    String? note,
     double? length,
     double? width,
     double? height,
@@ -129,6 +132,9 @@ class AiJobService {
       }
       if (negativePrompt != null && negativePrompt.trim().isNotEmpty) {
         request.fields['negativePrompt'] = negativePrompt.trim();
+      }
+      if (note != null && note.trim().isNotEmpty) {
+        request.fields['note'] = note.trim();
       }
       if (length != null) request.fields['TargetLength'] = '$length';
       if (width != null) request.fields['TargetWidth'] = '$width';

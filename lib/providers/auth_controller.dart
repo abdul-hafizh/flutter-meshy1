@@ -143,6 +143,33 @@ class AuthController extends ChangeNotifier {
   /// Re-fetches the current user (picks up a fresh AI credit balance after a
   /// purchase or generation). Silently no-ops on failure — the cached user
   /// just stays as-is, this is a best-effort refresh, not a critical path.
+  /// Updates the logged-in user's own profile and refreshes the cached
+  /// [user]. Returns null on success, or an error message on failure.
+  Future<String?> updateProfile({String? fullName, String? phone, String? whatsappNumber}) async {
+    final currentToken = token;
+    if (currentToken == null) return 'Sesi berakhir, silakan masuk kembali.';
+    isSubmitting = true;
+    notifyListeners();
+    try {
+      final updated = await AuthService.updateProfile(
+        token: currentToken,
+        fullName: fullName,
+        phone: phone,
+        whatsappNumber: whatsappNumber,
+      );
+      user = updated;
+      await SessionStore.save(currentToken, updated);
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    } catch (_) {
+      return 'Terjadi kesalahan tak terduga. Coba lagi.';
+    } finally {
+      isSubmitting = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> refreshUser() async {
     final currentToken = token;
     if (currentToken == null) return;

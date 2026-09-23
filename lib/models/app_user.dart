@@ -38,6 +38,7 @@ class AppUser {
   final String fullName;
   final String email;
   final String phone;
+  final String whatsappNumber;
   final int roleId;
   final String? role;
   final int credits;
@@ -51,6 +52,7 @@ class AppUser {
     required this.fullName,
     required this.email,
     required this.phone,
+    this.whatsappNumber = '',
     required this.roleId,
     this.role,
     this.credits = 0,
@@ -66,6 +68,7 @@ class AppUser {
       fullName: json['FullName']?.toString() ?? '',
       email: json['Email']?.toString() ?? '',
       phone: json['Phone']?.toString() ?? '',
+      whatsappNumber: json['WhatsappNumber']?.toString() ?? '',
       roleId: json['RoleId'] is int
           ? json['RoleId'] as int
           : int.tryParse('${json['RoleId']}') ?? 0,
@@ -89,6 +92,7 @@ class AppUser {
         'FullName': fullName,
         'Email': email,
         'Phone': phone,
+        'WhatsappNumber': whatsappNumber,
         'RoleId': roleId,
         'Role': role,
         'AICredits': credits,

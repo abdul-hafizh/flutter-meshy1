@@ -1,19 +1,5 @@
 import 'package:flutter/material.dart';
 
-class ProductCategory {
-  final String label;
-  final IconData icon;
-
-  const ProductCategory({required this.label, required this.icon});
-}
-
-const List<ProductCategory> kCategories = [
-  ProductCategory(label: 'Figurine', icon: Icons.person_outline_rounded),
-  ProductCategory(label: 'Aksesoris', icon: Icons.star_border_rounded),
-  ProductCategory(label: 'Dekorasi', icon: Icons.favorite_border_rounded),
-  ProductCategory(label: 'Gadget Case', icon: Icons.bolt_rounded),
-];
-
 enum OrderStatus { printing, shipped, done }
 
 extension OrderStatusX on OrderStatus {

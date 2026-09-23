@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../data/dummy_data.dart';
 import '../models/product.dart';
 import '../providers/auth_controller.dart';
 import '../services/auth_service.dart' show ApiException;
 import '../services/product_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/category_tile.dart';
 import '../widgets/product_card.dart';
 import '../widgets/section_header.dart';
 import '../widgets/token_balance_badge.dart';
@@ -16,8 +14,9 @@ import 'product_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback onCreateTap;
+  final VoidCallback onSeeAllTap;
 
-  const HomeScreen({super.key, required this.onCreateTap});
+  const HomeScreen({super.key, required this.onCreateTap, required this.onSeeAllTap});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -42,10 +41,10 @@ class _HomeScreenState extends State<HomeScreen> {
       _loadError = null;
     });
     try {
-      final products = await ProductService.listProducts(token: token, isPublished: true, limit: 20);
+      final page = await ProductService.listProducts(token: token, isPublished: true, limit: 20);
       if (!mounted) return;
       setState(() {
-        _readyProducts = products.where((p) => p.inStock).take(6).toList();
+        _readyProducts = page.items.where((p) => p.inStock).take(6).toList();
         _loadingProducts = false;
       });
     } on ApiException catch (e) {
@@ -135,25 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 22),
           _CreatePromptCard(onTap: widget.onCreateTap),
           const SizedBox(height: 26),
-          const Text(
-            'Kategori',
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              for (final c in kCategories) ...[
-                Expanded(child: CategoryTile(category: c)),
-                if (c != kCategories.last) const SizedBox(width: 10),
-              ],
-            ],
-          ),
-          const SizedBox(height: 26),
-          SectionHeader(title: 'Produk Siap Checkout', actionLabel: 'Lihat Semua', onAction: () {}),
+          SectionHeader(title: 'Produk Siap Checkout', actionLabel: 'Lihat Semua', onAction: widget.onSeeAllTap),
           const SizedBox(height: 12),
           if (_loadingProducts)
             const Padding(

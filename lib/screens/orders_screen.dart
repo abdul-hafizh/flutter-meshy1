@@ -36,27 +36,31 @@ class OrdersScreenState extends State<OrdersScreen> {
   String? _selectedJobId;
   String? _selectedPrompt;
 
+  static const _ordersPageSize = 10;
+
   bool _ordersLoading = true;
+  bool _ordersLoadingMore = false;
   bool _ordersLoadedOnce = false;
   List<PhysicalOrder> _physicalOrders = [];
+  int _ordersPage = 1;
+  bool _ordersHasMore = false;
   String? _selectedOrderId;
-  // null = every physical order; otherwise only that Shopee-style tab.
+  // null = every physical order ("Semua"); otherwise only that Shopee-style
+  // tab — the backend does the filtering (see OrderService.listMinePaged),
+  // so switching tabs re-fetches from page 1 rather than filtering in place.
   OrderTab? _physicalFilter;
 
-  // Server-side badge counts; falls back to counting the loaded list.
+  // Badge counts (unpaid/packing/shipped/review/history) — independent of
+  // whichever tab's page is currently loaded below.
   Map<OrderTab, int>? _serverCounts;
 
-  int _countFor(OrderTab tab) => _serverCounts?[tab] ?? _physicalOrders.where((o) => o.tab == tab).length;
+  int _countFor(OrderTab tab) => _serverCounts?[tab] ?? 0;
 
-  List<PhysicalOrder> get _visiblePhysicalOrders {
-    final filter = _physicalFilter;
-    if (filter == null) return _physicalOrders;
-    if (filter == OrderTab.history) return _physicalOrders.where((o) => o.isCompleted || o.isCancelled).toList();
-    return _physicalOrders.where((o) => o.tab == filter).toList();
-  }
+  final _ordersScrollController = ScrollController();
 
   void _toggleFilter(OrderTab tab) {
     setState(() => _physicalFilter = _physicalFilter == tab ? null : tab);
+    _loadOrders();
   }
 
   // Polls Meshy for progress on any still-processing job so the list updates
@@ -69,12 +73,24 @@ class OrdersScreenState extends State<OrdersScreen> {
   void initState() {
     super.initState();
     _load();
+    _ordersScrollController.addListener(_onOrdersScroll);
   }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _ordersScrollController.removeListener(_onOrdersScroll);
+    _ordersScrollController.dispose();
     super.dispose();
+  }
+
+  // Fires while scrolling the physical-orders list; requests the next page a
+  // bit before the user actually hits the bottom. Only relevant on that
+  // sub-tab — the AI-jobs list below loads everything in one shot.
+  void _onOrdersScroll() {
+    if (_mainTab != 'physical' || !_ordersHasMore || _ordersLoading || _ordersLoadingMore) return;
+    if (_ordersScrollController.position.pixels < _ordersScrollController.position.maxScrollExtent - 300) return;
+    _loadMoreOrders();
   }
 
   /// Refetches the job list from the server. Called by [MainShell] whenever
@@ -90,20 +106,53 @@ class OrdersScreenState extends State<OrdersScreen> {
     if (token == null) return;
     setState(() => _ordersLoading = true);
     try {
-      final orders = await OrderService.listMine(token: token);
+      final page = await OrderService.listMinePaged(
+        token: token,
+        tab: _physicalFilter?.name,
+        page: 1,
+        limit: _ordersPageSize,
+      );
       if (!mounted) return;
-      setState(() => _physicalOrders = orders);
+      setState(() {
+        _physicalOrders = page.items;
+        _ordersPage = 1;
+        _ordersHasMore = page.hasMore;
+      });
       try {
         final counts = await OrderService.counts(token: token);
         if (mounted) setState(() => _serverCounts = counts);
       } catch (_) {
-        // Badges fall back to counting the loaded list.
+        // Badges fall back to whatever counts were last loaded (or none).
       }
     } catch (_) {
       // Best-effort — keep whatever list was already showing.
     } finally {
       if (mounted) setState(() => _ordersLoading = false);
       _ordersLoadedOnce = true;
+    }
+  }
+
+  Future<void> _loadMoreOrders() async {
+    final token = context.read<AuthController>().token;
+    if (token == null) return;
+    setState(() => _ordersLoadingMore = true);
+    try {
+      final page = await OrderService.listMinePaged(
+        token: token,
+        tab: _physicalFilter?.name,
+        page: _ordersPage + 1,
+        limit: _ordersPageSize,
+      );
+      if (!mounted) return;
+      setState(() {
+        _physicalOrders = [..._physicalOrders, ...page.items];
+        _ordersPage += 1;
+        _ordersHasMore = page.hasMore;
+      });
+    } catch (_) {
+      // Best-effort — the scroll listener will simply retry on the next tick.
+    } finally {
+      if (mounted) setState(() => _ordersLoadingMore = false);
     }
   }
 
@@ -233,6 +282,7 @@ class OrdersScreenState extends State<OrdersScreen> {
       child: RefreshIndicator(
         onRefresh: reload,
         child: ListView(
+          controller: _ordersScrollController,
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           children: [
             const Text(
@@ -360,8 +410,8 @@ class OrdersScreenState extends State<OrdersScreen> {
                   padding: EdgeInsets.only(top: 40),
                   child: Center(child: CircularProgressIndicator()),
                 )
-              else if (_visiblePhysicalOrders.isEmpty)
-                _physicalOrders.isEmpty
+              else if (_physicalOrders.isEmpty)
+                _physicalFilter == null
                     ? const _PhysicalEmptyState()
                     : const Padding(
                         padding: EdgeInsets.only(top: 40),
@@ -372,14 +422,20 @@ class OrdersScreenState extends State<OrdersScreen> {
                           ),
                         ),
                       )
-              else
-                for (final order in _visiblePhysicalOrders) ...[
+              else ...[
+                for (final order in _physicalOrders) ...[
                   _PhysicalOrderCard(
                     order: order,
                     onTap: () => setState(() => _selectedOrderId = order.id),
                   ),
-                  if (order != _visiblePhysicalOrders.last) const SizedBox(height: 12),
+                  if (order != _physicalOrders.last) const SizedBox(height: 12),
                 ],
+                if (_ordersLoadingMore)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 16),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+              ],
             ],
           ],
         ),

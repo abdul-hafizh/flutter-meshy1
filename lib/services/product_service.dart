@@ -4,6 +4,16 @@ import '../models/product.dart';
 import 'api_client.dart';
 import 'api_config.dart';
 
+/// One page of [ProductService.listProducts] — [hasMore] tells the caller
+/// whether another page is worth fetching (page-based, driven by the
+/// backend's own `pagination.totalPages`, not an item-count guess).
+class ProductPage {
+  final List<Product> items;
+  final bool hasMore;
+
+  const ProductPage({required this.items, required this.hasMore});
+}
+
 /// Ready-made merchant products (`/api/products`, `/api/product-categories`)
 /// — the "pick and checkout" catalog, distinct from `AiJobService`'s custom
 /// prompt-to-3D flow.
@@ -17,15 +27,16 @@ class ProductService {
         'Authorization': 'Bearer $token',
       };
 
-  static Future<List<Product>> listProducts({
+  static Future<ProductPage> listProducts({
     required String token,
     String? search,
     String? sellerName,
     int? categoryId,
     bool? isPublished,
-    int limit = 50,
+    int page = 1,
+    int limit = 10,
   }) async {
-    final query = <String, String>{'limit': '$limit'};
+    final query = <String, String>{'page': '$page', 'limit': '$limit'};
     if (search != null && search.trim().isNotEmpty) query['search'] = search.trim();
     if (sellerName != null && sellerName.trim().isNotEmpty) query['sellerName'] = sellerName.trim();
     if (categoryId != null) query['categoryId'] = '$categoryId';
@@ -41,7 +52,12 @@ class ProductService {
     }
     final decoded = decodeApiResponse(res);
     final list = decoded['data'] as List<dynamic>? ?? [];
-    return list.map((e) => Product.fromJson(e as Map<String, dynamic>)).toList();
+    final pagination = decoded['pagination'] as Map<String, dynamic>?;
+    final totalPages = pagination?['totalPages'] is int ? pagination!['totalPages'] as int : 1;
+    return ProductPage(
+      items: list.map((e) => Product.fromJson(e as Map<String, dynamic>)).toList(),
+      hasMore: page < totalPages,
+    );
   }
 
   static Future<Product> getById({required String token, required String productId}) async {

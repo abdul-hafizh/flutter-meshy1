@@ -5,6 +5,7 @@ import '../providers/auth_controller.dart';
 import '../providers/chat_controller.dart';
 import '../theme/app_theme.dart';
 import 'addresses/address_list_screen.dart';
+import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -288,45 +289,80 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const AddressListScreen()),
-              ),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: AppColors.purple.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.location_on_outlined, size: 19, color: AppColors.purple),
-                    ),
-                    const SizedBox(width: 14),
-                    const Expanded(
-                      child: Text(
-                        'Alamat Saya',
-                        style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right_rounded, color: AppColors.textFaint),
-                  ],
-                ),
-              ),
+          _ProfileMenuItem(
+            icon: Icons.edit_outlined,
+            label: 'Edit Profil',
+            onTap: () async {
+              final updated = await Navigator.of(context).push<bool>(
+                MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+              );
+              // The screen already updates AuthController's cached user on
+              // save — this refresh only exists to also re-pull TierDetails,
+              // which the profile-update endpoint doesn't return.
+              if (updated == true && context.mounted) {
+                context.read<AuthController>().refreshUser();
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+          _ProfileMenuItem(
+            icon: Icons.location_on_outlined,
+            label: 'Alamat Saya',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const AddressListScreen()),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// One tappable row on the Profil screen (icon, label, chevron) — used for
+/// "Edit Profil", "Alamat Saya", and any future profile-related shortcut.
+class _ProfileMenuItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _ProfileMenuItem({required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: AppColors.purple.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 19, color: AppColors.purple),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.textFaint),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -6,6 +6,16 @@ import '../models/physical_order.dart';
 import 'api_client.dart';
 import 'api_config.dart';
 
+/// One page of [OrderService.listMinePaged] — [hasMore] tells the caller
+/// whether another page is worth fetching (page-based, driven by the
+/// backend's own `pagination.totalPages`, not an item-count guess).
+class PhysicalOrderPage {
+  final List<PhysicalOrder> items;
+  final bool hasMore;
+
+  const PhysicalOrderPage({required this.items, required this.hasMore});
+}
+
 /// Physical 3D-print orders (`/api/orders`) — distinct from AI-generation
 /// jobs (`AiJobService`). The backend already scopes `GET /orders` to the
 /// logged-in customer's own orders.
@@ -19,6 +29,9 @@ class OrderService {
         'Authorization': 'Bearer $token',
       };
 
+  /// Single-shot fetch of up to 100 orders, unfiltered — used where a bounded
+  /// "just give me everything" list is fine (e.g. the order-sharing picker in
+  /// chat). For the paginated Pesanan Saya list, use [listMinePaged] instead.
   static Future<List<PhysicalOrder>> listMine({required String token}) async {
     http.Response res;
     try {
@@ -29,6 +42,36 @@ class OrderService {
     final decoded = decodeApiResponse(res);
     final list = decoded['data'] as List<dynamic>? ?? [];
     return list.map((e) => PhysicalOrder.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Paginated orders, optionally scoped to one of the Pesanan Saya tabs
+  /// ('unpaid' | 'packing' | 'shipped' | 'review' | 'history' — matches
+  /// [OrderTab.name]). The backend computes tab membership itself (payment,
+  /// shipment and rating state), so pagination stays correct instead of
+  /// client-side filtering a fixed-size fetched list.
+  static Future<PhysicalOrderPage> listMinePaged({
+    required String token,
+    String? tab,
+    int page = 1,
+    int limit = 10,
+  }) async {
+    final query = {'page': '$page', 'limit': '$limit', if (tab != null) 'tab': tab};
+    http.Response res;
+    try {
+      res = await http
+          .get(_uri('/orders').replace(queryParameters: query), headers: _headers(token))
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
+    }
+    final decoded = decodeApiResponse(res);
+    final list = decoded['data'] as List<dynamic>? ?? [];
+    final pagination = decoded['pagination'] as Map<String, dynamic>?;
+    final totalPages = pagination?['totalPages'] is int ? pagination!['totalPages'] as int : 1;
+    return PhysicalOrderPage(
+      items: list.map((e) => PhysicalOrder.fromJson(e as Map<String, dynamic>)).toList(),
+      hasMore: page < totalPages,
+    );
   }
 
   /// Per-tab badge counts (unpaid/packing/shipped/review/history), computed
