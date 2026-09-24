@@ -517,9 +517,11 @@ class _ShipmentCardState extends State<_ShipmentCard> {
             const Text('Belum ada info pengiriman.', style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary))
           else ...[
             Text(
-              [shipment.courierCompany?.toUpperCase(), shipment.courierServiceName]
-                  .where((s) => s != null && s.isNotEmpty)
-                  .join(' · '),
+              shipment.isPickup
+                  ? 'Ambil di Toko (Gratis)'
+                  : [shipment.courierCompany?.toUpperCase(), shipment.courierServiceName]
+                      .where((s) => s != null && s.isNotEmpty)
+                      .join(' · '),
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
             ),
             const SizedBox(height: 4),

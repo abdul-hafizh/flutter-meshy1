@@ -39,6 +39,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   List<PaymentMethodOption> _paymentMethods = [];
 
+  bool _isPickup = false;
   UserAddress? _selectedAddress;
   int? _selectedPaymentMethodId;
 
@@ -202,17 +203,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String _categoryLabel(String key) => key == _otherCategoryKey ? 'Lainnya' : shippingCategoryLabel(key);
 
   bool get _canSubmit =>
-      _selectedAddress != null &&
-      _selectedRate != null &&
-      _selectedPaymentMethodId != null &&
-      !_submitting;
+      _isPickup
+          ? (_selectedPaymentMethodId != null && !_submitting)
+          : (_selectedAddress != null &&
+              _selectedRate != null &&
+              _selectedPaymentMethodId != null &&
+              !_submitting);
 
   Future<void> _submit() async {
     final token = _token;
-    final address = _selectedAddress;
-    final rate = _selectedRate;
-    if (token == null || address == null || rate == null || _selectedPaymentMethodId == null) {
-      return;
+    if (token == null || _selectedPaymentMethodId == null) return;
+
+    if (!_isPickup) {
+      final address = _selectedAddress;
+      final rate = _selectedRate;
+      if (address == null || rate == null) return;
     }
 
     setState(() {
@@ -221,19 +226,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
 
     try {
-      final match = matchRateToCatalog(rate, _catalog);
-      await OrderService.checkout(
-        token: token,
-        orderId: widget.order.id,
-        userAddressId: address.id,
-        courierCompany: rate.courierCompany,
-        courierType: rate.courierType,
-        courierServiceName: rate.courierServiceName,
-        packageWeightGrams: int.tryParse(_weightCtrl.text.trim()) ?? 500,
-        shippingCost: rate.price,
-        shippingMethodId: match?.method.id,
-        shippingServiceId: match?.service?.id,
-      );
+      if (_isPickup) {
+        await OrderService.checkoutPickup(token: token, orderId: widget.order.id);
+      } else {
+        final address = _selectedAddress!;
+        final rate = _selectedRate!;
+        final match = matchRateToCatalog(rate, _catalog);
+        await OrderService.checkout(
+          token: token,
+          orderId: widget.order.id,
+          userAddressId: address.id,
+          courierCompany: rate.courierCompany,
+          courierType: rate.courierType,
+          courierServiceName: rate.courierServiceName,
+          packageWeightGrams: int.tryParse(_weightCtrl.text.trim()) ?? 500,
+          shippingCost: rate.price,
+          shippingMethodId: match?.method.id,
+          shippingServiceId: match?.service?.id,
+        );
+      }
 
       final payment = await OrderPaymentService.createSnapToken(
         token: token,
@@ -305,7 +316,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget build(BuildContext context) {
     final order = widget.order;
     final itemAmount = order.totalAmount ?? 0;
-    final totalAmount = itemAmount + (_selectedRate?.price ?? 0);
+    final totalAmount = itemAmount + (_isPickup ? 0 : (_selectedRate?.price ?? 0));
     final subtotalAmount = order.subtotalAmount;
     final discountAmount = order.discountAmount ?? 0;
     final taxAmount = order.taxAmount;
@@ -340,62 +351,103 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                     children: [
-                      const _SectionTitle('Alamat Pengiriman'),
+                      const _SectionTitle('Metode Pengiriman'),
                       const SizedBox(height: 10),
-                      _AddressSection(address: _selectedAddress, onChange: _pickAddress),
+                      _DeliveryModeToggle(
+                        isPickup: _isPickup,
+                        onChanged: (v) => setState(() => _isPickup = v),
+                      ),
                       const SizedBox(height: 22),
-                      const _SectionTitle('Berat Paket'),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _weightCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          suffixText: 'gram',
-                          filled: true,
-                          fillColor: AppColors.surface,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColors.border)),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColors.border)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      if (_isPickup) ...[
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.storefront_rounded, size: 20, color: AppColors.purple),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      order.merchant?.fullName ?? 'Toko Merchant',
+                                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    const Text(
+                                      'Ambil pesanan langsung di toko — gratis, tanpa ongkos kirim. Merchant akan menghubungimu saat pesanan siap diambil.',
+                                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 14),
-                      OutlinedButton.icon(
-                        onPressed: _selectedAddress == null || _checkingRates ? null : _checkRates,
-                        icon: _checkingRates
-                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                            : const Icon(Icons.local_shipping_outlined, size: 18),
-                        label: Text(_checkingRates ? 'Mengecek ongkos kirim...' : 'Cek Ongkir'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          side: const BorderSide(color: AppColors.purple),
-                          foregroundColor: AppColors.purple,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          minimumSize: const Size(double.infinity, 0),
-                        ),
-                      ),
-                      if (_ratesError != null) ...[
+                      ] else ...[
+                        const _SectionTitle('Alamat Pengiriman'),
                         const SizedBox(height: 10),
-                        Text(_ratesError!, style: const TextStyle(fontSize: 12.5, color: Color(0xFFE0453A), fontWeight: FontWeight.w600)),
-                      ],
-                      if (_rates.isNotEmpty) ...[
+                        _AddressSection(address: _selectedAddress, onChange: _pickAddress),
+                        const SizedBox(height: 22),
+                        const _SectionTitle('Berat Paket'),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: _weightCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            suffixText: 'gram',
+                            filled: true,
+                            fillColor: AppColors.surface,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColors.border)),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColors.border)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          ),
+                        ),
                         const SizedBox(height: 14),
-                        const _SectionTitle('Kategori Pengiriman'),
-                        const SizedBox(height: 10),
-                        _ShippingCategoryChips(
-                          categories: _groupRatesByCategory(_rates).keys.toList(),
-                          selected: _selectedCategoryType,
-                          labelOf: _categoryLabel,
-                          onSelect: (key) => setState(() => _selectedCategoryType = key),
+                        OutlinedButton.icon(
+                          onPressed: _selectedAddress == null || _checkingRates ? null : _checkRates,
+                          icon: _checkingRates
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.local_shipping_outlined, size: 18),
+                          label: Text(_checkingRates ? 'Mengecek ongkos kirim...' : 'Cek Ongkir'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            side: const BorderSide(color: AppColors.purple),
+                            foregroundColor: AppColors.purple,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            minimumSize: const Size(double.infinity, 0),
+                          ),
                         ),
-                        const SizedBox(height: 16),
-                        const _SectionTitle('Pilih Kurir'),
-                        const SizedBox(height: 10),
-                        _ShippingRateList(
-                          rates: _groupRatesByCategory(_rates)[_selectedCategoryType] ?? const [],
-                          selected: _selectedRate,
-                          onSelect: (r) => setState(() => _selectedRate = r),
-                          rupiah: _rupiah,
-                        ),
+                        if (_ratesError != null) ...[
+                          const SizedBox(height: 10),
+                          Text(_ratesError!, style: const TextStyle(fontSize: 12.5, color: Color(0xFFE0453A), fontWeight: FontWeight.w600)),
+                        ],
+                        if (_rates.isNotEmpty) ...[
+                          const SizedBox(height: 14),
+                          const _SectionTitle('Kategori Pengiriman'),
+                          const SizedBox(height: 10),
+                          _ShippingCategoryChips(
+                            categories: _groupRatesByCategory(_rates).keys.toList(),
+                            selected: _selectedCategoryType,
+                            labelOf: _categoryLabel,
+                            onSelect: (key) => setState(() => _selectedCategoryType = key),
+                          ),
+                          const SizedBox(height: 16),
+                          const _SectionTitle('Pilih Kurir'),
+                          const SizedBox(height: 10),
+                          _ShippingRateList(
+                            rates: _groupRatesByCategory(_rates)[_selectedCategoryType] ?? const [],
+                            selected: _selectedRate,
+                            onSelect: (r) => setState(() => _selectedRate = r),
+                            rupiah: _rupiah,
+                          ),
+                        ],
                       ],
                       const SizedBox(height: 22),
                       const _SectionTitle('Metode Pembayaran'),
@@ -436,7 +488,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               if (appFeeAmount != null) _priceRow('Biaya Layanan Aplikasi', _rupiah(appFeeAmount)),
                             ] else
                               _priceRow('Harga Barang', _rupiah(itemAmount)),
-                            _priceRow('Ongkos Kirim', _selectedRate != null ? _rupiah(_selectedRate!.price) : '-'),
+                            _priceRow(
+                              'Ongkos Kirim',
+                              _isPickup
+                                  ? 'Gratis (Ambil di Toko)'
+                                  : (_selectedRate != null ? _rupiah(_selectedRate!.price) : '-'),
+                            ),
                             const Divider(height: 20, color: AppColors.border),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -482,6 +539,62 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(title, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary));
+  }
+}
+
+/// "Kirim" (courier, live Biteship rates) vs "Ambil di Toko" (pick up, free,
+/// no address/rate step needed) — two equal-width segments.
+class _DeliveryModeToggle extends StatelessWidget {
+  final bool isPickup;
+  final ValueChanged<bool> onChanged;
+
+  const _DeliveryModeToggle({required this.isPickup, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Expanded(child: _segment(label: 'Kirim', icon: Icons.local_shipping_outlined, selected: !isPickup, onTap: () => onChanged(false))),
+          Expanded(child: _segment(label: 'Ambil di Toko', icon: Icons.storefront_rounded, selected: isPickup, onTap: () => onChanged(true))),
+        ],
+      ),
+    );
+  }
+
+  Widget _segment({required String label, required IconData icon, required bool selected, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.purple : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: selected ? Colors.white : AppColors.textSecondary),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: selected ? Colors.white : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

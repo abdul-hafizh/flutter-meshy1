@@ -124,6 +124,7 @@ class OrderShippingAddress {
 
 class ShipmentInfo {
   final String id;
+  final String shipmentType;
   final String? courierCompany;
   final String? courierServiceName;
   final int? packageWeight;
@@ -135,6 +136,7 @@ class ShipmentInfo {
 
   const ShipmentInfo({
     required this.id,
+    this.shipmentType = 'COURIER',
     this.courierCompany,
     this.courierServiceName,
     this.packageWeight,
@@ -148,6 +150,7 @@ class ShipmentInfo {
   factory ShipmentInfo.fromJson(Map<String, dynamic> json) {
     return ShipmentInfo(
       id: json['Id']?.toString() ?? '',
+      shipmentType: json['ShipmentType']?.toString() ?? 'COURIER',
       courierCompany: json['CourierCompany']?.toString(),
       courierServiceName: json['CourierServiceName']?.toString(),
       packageWeight: json['PackageWeight'] is int ? json['PackageWeight'] as int : int.tryParse('${json['PackageWeight']}'),
@@ -158,6 +161,8 @@ class ShipmentInfo {
       deliveredAt: DateTime.tryParse(json['DeliveredAt']?.toString() ?? ''),
     );
   }
+
+  bool get isPickup => shipmentType == 'PICKUP';
 }
 
 class PaymentInfo {

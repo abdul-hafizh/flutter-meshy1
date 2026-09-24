@@ -186,6 +186,34 @@ class OrderService {
     return PhysicalOrder.fromJson(data['order'] as Map<String, dynamic>);
   }
 
+  /// Pick Up checkout — customer collects the order at the merchant's store.
+  /// No address, no courier, no shipping cost; skips Biteship entirely (see
+  /// checkoutOrder's IsPickup branch on the backend).
+  static Future<PhysicalOrder> checkoutPickup({
+    required String token,
+    required String orderId,
+    String? notes,
+  }) async {
+    http.Response res;
+    try {
+      res = await http
+          .post(
+            _uri('/orders/$orderId/checkout'),
+            headers: _headers(token),
+            body: jsonEncode({
+              'IsPickup': true,
+              if (notes != null && notes.trim().isNotEmpty) 'Notes': notes.trim(),
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+    } catch (_) {
+      throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
+    }
+    final decoded = decodeApiResponse(res);
+    final data = decoded['data'] as Map<String, dynamic>;
+    return PhysicalOrder.fromJson(data['order'] as Map<String, dynamic>);
+  }
+
   /// Customer-initiated "Pesanan Diterima" — marks the order Completed and
   /// stamps the shipment's DeliveredAt, unlocking the rating form. Distinct
   /// from the merchant/system-driven status transitions elsewhere in the
