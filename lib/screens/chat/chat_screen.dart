@@ -4,6 +4,7 @@ import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 
 import '../../models/physical_order.dart';
 import '../../providers/auth_controller.dart';
+import '../../services/api_config.dart';
 import '../../services/auth_service.dart' show ApiException;
 import '../../services/order_service.dart';
 import '../../theme/app_theme.dart';
@@ -69,14 +70,31 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  /// The other participant of this 1:1 chat — the merchant. Stream user ids
+  /// are the backend's User.Id, the same id an order's Merchant carries.
+  String? get _counterpartId {
+    final myId = widget.client.state.currentUser?.id;
+    final members = widget.channel.state?.members ?? const <Member>[];
+    for (final m in members) {
+      final id = m.userId ?? m.user?.id;
+      if (id != null && id != myId) return id;
+    }
+    return null;
+  }
+
   Future<void> _shareOrder() async {
     final order = await showModalBottomSheet<PhysicalOrder>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const _OrderPickerSheet(),
+      builder: (_) => _OrderPickerSheet(merchantId: _counterpartId),
     );
     if (order == null || !mounted) return;
+
+    // Snapshot the order's title + picture into the message itself (like
+    // PRODUCT_LINK's thumbnailPath), so both apps can render the card
+    // without fetching the order.
+    final display = order.display(customerUserId: context.read<AuthController>().user?.id);
 
     setState(() => _sendingOrderLink = true);
     try {
@@ -93,6 +111,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 'orderId': order.id,
                 'orderNumber': order.orderNumber,
                 'totalAmount': order.totalAmount,
+                'title': display.title,
+                'thumbnailPath': display.imageUrl,
               },
             ),
           ],
@@ -179,11 +199,16 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-/// Bottom sheet listing the customer's own priced orders — the merchant-side
+/// Bottom sheet listing the customer's own priced orders with the merchant
+/// of this chat — orders placed with other merchants are left out so one
+/// can't be shared into the wrong conversation. The merchant-side
 /// equivalent (picking one of THEIR OWN orders/products) lives in the
 /// Next.js dashboard, since this Flutter app has no merchant role.
 class _OrderPickerSheet extends StatefulWidget {
-  const _OrderPickerSheet();
+  /// Null when the chat's merchant can't be determined — then nothing is offered.
+  final String? merchantId;
+
+  const _OrderPickerSheet({required this.merchantId});
 
   @override
   State<_OrderPickerSheet> createState() => _OrderPickerSheetState();
@@ -201,11 +226,17 @@ class _OrderPickerSheetState extends State<_OrderPickerSheet> {
 
   Future<void> _load() async {
     final token = context.read<AuthController>().token;
-    if (token == null) return;
+    final merchantId = widget.merchantId?.toLowerCase();
+    if (token == null || merchantId == null) {
+      setState(() => _loading = false);
+      return;
+    }
     try {
       final orders = await OrderService.listMine(token: token);
       if (!mounted) return;
-      setState(() => _orders = orders.where((o) => o.isPriced).toList());
+      setState(() => _orders = orders
+          .where((o) => o.isPriced && o.merchant?.id.toLowerCase() == merchantId)
+          .toList());
     } catch (_) {
       // Best-effort — the sheet just shows an empty state below.
     } finally {
@@ -256,7 +287,7 @@ class _OrderPickerSheetState extends State<_OrderPickerSheet> {
                           padding: EdgeInsets.symmetric(vertical: 32),
                           child: Center(
                             child: Text(
-                              'Belum ada pesanan yang bisa dikirim.',
+                              'Belum ada pesanan dengan penjual ini.',
                               style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
                             ),
                           ),
@@ -291,6 +322,12 @@ class _OrderOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final totalAmount = order.totalAmount;
+    final display = order.display(customerUserId: context.read<AuthController>().user?.id);
+    final imageUrl = display.imageUrl;
+    final orderLine = [
+      '#${order.orderNumber ?? order.id}',
+      if (totalAmount != null) _rupiah(totalAmount),
+    ].join(' · ');
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -305,14 +342,17 @@ class _OrderOption extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  gradient: AppColors.brandGradientSoft,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.receipt_long_rounded, size: 18, color: AppColors.purple),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: imageUrl != null
+                    ? Image.network(
+                        ApiConfig.assetUrl(imageUrl),
+                        width: 52,
+                        height: 52,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => _OrderThumbFallback(kind: display.kind),
+                      )
+                    : _OrderThumbFallback(kind: display.kind),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -321,16 +361,18 @@ class _OrderOption extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '#${order.orderNumber ?? order.id}',
-                      maxLines: 1,
+                      display.title,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                     ),
-                    if (totalAmount != null)
-                      Text(
-                        _rupiah(totalAmount),
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                      ),
+                    const SizedBox(height: 2),
+                    Text(
+                      orderLine,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
                   ],
                 ),
               ),
@@ -339,6 +381,28 @@ class _OrderOption extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Shown when an order has no picture (custom/manual orders) or it fails to load.
+class _OrderThumbFallback extends StatelessWidget {
+  final OrderKind kind;
+
+  const _OrderThumbFallback({required this.kind});
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (kind) {
+      OrderKind.product => Icons.inventory_2_rounded,
+      OrderKind.aiDesign => Icons.view_in_ar_rounded,
+      OrderKind.custom => Icons.receipt_long_rounded,
+    };
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: const BoxDecoration(gradient: AppColors.brandGradientSoft),
+      child: Icon(icon, size: 22, color: AppColors.purple),
     );
   }
 }

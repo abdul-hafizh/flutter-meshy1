@@ -7,6 +7,7 @@ import '../models/ai_job.dart';
 import '../models/physical_order.dart';
 import '../providers/auth_controller.dart';
 import '../services/ai_job_service.dart';
+import '../services/api_config.dart';
 import '../services/auth_service.dart' show ApiException;
 import '../services/order_service.dart';
 import '../theme/app_theme.dart';
@@ -602,7 +603,9 @@ class _PhysicalOrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = order.status;
-    final previewUrl = order.primaryItem?.aiModel?.previewUrl;
+    // Same product / own-AI-design / custom rules as the chat order picker —
+    // so an old custom order's placeholder AI model never shows up here.
+    final previewUrl = order.display(customerUserId: context.read<AuthController>().user?.id).imageUrl;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -622,7 +625,7 @@ class _PhysicalOrderCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 child: previewUrl != null
                     ? Image.network(
-                        previewUrl,
+                        ApiConfig.assetUrl(previewUrl),
                         width: 46,
                         height: 46,
                         fit: BoxFit.cover,

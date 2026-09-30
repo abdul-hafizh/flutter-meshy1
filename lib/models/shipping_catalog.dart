@@ -42,7 +42,8 @@ class ShippingMethodCategory {
   /// since neither side's naming convention is guaranteed to line up
   /// exactly ("J&T" vs Biteship's "jnt", etc).
   bool matchesProvider(String courierCompany) {
-    String normalize(String s) => s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    // "&" reads as "n" so our "J&T" lines up with Biteship's "jnt".
+    String normalize(String s) => s.toLowerCase().replaceAll('&', 'n').replaceAll(RegExp(r'[^a-z0-9]'), '');
     final p = normalize(provider ?? name);
     final c = normalize(courierCompany);
     if (p.isEmpty || c.isEmpty) return false;
@@ -111,23 +112,35 @@ class ShippingRateMatch {
 /// Finds which catalog category (and, best-effort, which specific service
 /// under it) a live Biteship rate belongs to — `null` when no catalog entry
 /// matches, which the picker groups under "Lainnya" instead of dropping it.
+///
+/// One courier can sit in several categories (JNE: "JNE" = Reguler and
+/// "JNE Trucking" = Kargo), so the rate's service code decides: an exact
+/// code match wins, then a loose one; with no code match at all it goes to
+/// the courier's non-cargo category rather than whichever came first.
 ShippingRateMatch? matchRateToCatalog(ShippingRateOption rate, List<ShippingMethodCategory> catalog) {
-  for (final method in catalog) {
-    if (!method.matchesProvider(rate.courierCompany)) continue;
+  final candidates = catalog.where((m) => m.matchesProvider(rate.courierCompany)).toList();
+  if (candidates.isEmpty) return null;
 
-    ShippingServiceOption? bestService;
-    final type = rate.courierType.toLowerCase();
+  // Punctuation-insensitive: Biteship's "same_day" == our "SAMEDAY".
+  String norm(String s) => s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  final type = norm(rate.courierType);
+  ShippingRateMatch? loose;
+  for (final method in candidates) {
     for (final service in method.services) {
-      final code = (service.serviceCode ?? '').toLowerCase();
-      if (code.isEmpty) continue;
-      if (code == type || (type.isNotEmpty && (type.contains(code) || code.contains(type)))) {
-        bestService = service;
-        break;
+      final code = norm(service.serviceCode ?? '');
+      if (code.isEmpty || type.isEmpty) continue;
+      if (code == type) return ShippingRateMatch(method: method, service: service);
+      if (loose == null && (type.contains(code) || code.contains(type))) {
+        loose = ShippingRateMatch(method: method, service: service);
       }
     }
-    bestService ??= method.services.isNotEmpty ? method.services.first : null;
-
-    return ShippingRateMatch(method: method, service: bestService);
   }
-  return null;
+  if (loose != null) return loose;
+
+  const preferred = ['REGULAR_SHIPMENT', 'INSTANT_SHIPMENT'];
+  final method = candidates.firstWhere(
+    (m) => preferred.contains(m.shippingType.toUpperCase()),
+    orElse: () => candidates.first,
+  );
+  return ShippingRateMatch(method: method, service: method.services.isNotEmpty ? method.services.first : null);
 }

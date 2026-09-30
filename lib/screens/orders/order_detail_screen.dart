@@ -724,7 +724,7 @@ class _ActionArea extends StatelessWidget {
               children: [
                 if (hasBreakdown) ...[
                   _priceRow('Harga Barang', rupiah(subtotalAmount)),
-                  if (discountAmount > 0) _priceRow('Diskon Tier', '-${rupiah(discountAmount)}', valueColor: const Color(0xFF1FAA59)),
+                  if (discountAmount > 0) _priceRow(order.tierDiscountLabel, '-${rupiah(discountAmount)}', valueColor: const Color(0xFF1FAA59)),
                   if (taxAmount != null) _priceRow('PPN', rupiah(taxAmount)),
                   if (appFeeAmount != null) _priceRow('Biaya Layanan Aplikasi', rupiah(appFeeAmount)),
                   const Divider(height: 20, color: AppColors.border),

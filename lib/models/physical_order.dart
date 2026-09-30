@@ -75,17 +75,49 @@ class PhysicalOrderItem {
   final AiModel? aiModel;
   final OrderProductInfo? product;
 
-  const PhysicalOrderItem({required this.id, this.quantity, this.unitPrice, this.aiModel, this.product});
+  /// User.Id of whoever generated [aiModel] (its AI job) — used to tell a
+  /// customer's own design apart from the placeholder model older custom
+  /// orders were saved with. Null when the backend didn't include the job.
+  final String? aiOwnerUserId;
+
+  /// The text prompt behind [aiModel], if it was a text-to-3D job.
+  final String? aiPrompt;
+
+  const PhysicalOrderItem({
+    required this.id,
+    this.quantity,
+    this.unitPrice,
+    this.aiModel,
+    this.product,
+    this.aiOwnerUserId,
+    this.aiPrompt,
+  });
 
   factory PhysicalOrderItem.fromJson(Map<String, dynamic> json) {
+    final aiJson = json['AIModel'] is Map<String, dynamic> ? json['AIModel'] as Map<String, dynamic> : null;
+    final jobJson = aiJson?['Job'] is Map<String, dynamic> ? aiJson!['Job'] as Map<String, dynamic> : null;
     return PhysicalOrderItem(
       id: json['Id']?.toString() ?? '',
       quantity: json['Quantity'] is int ? json['Quantity'] as int : int.tryParse('${json['Quantity']}'),
       unitPrice: json['UnitPrice'] is int ? json['UnitPrice'] as int : int.tryParse('${json['UnitPrice']}'),
-      aiModel: json['AIModel'] is Map<String, dynamic> ? AiModel.fromJson(json['AIModel'] as Map<String, dynamic>) : null,
+      aiModel: aiJson != null ? AiModel.fromJson(aiJson) : null,
       product: json['Product'] is Map<String, dynamic> ? OrderProductInfo.fromJson(json['Product'] as Map<String, dynamic>) : null,
+      aiOwnerUserId: jobJson?['UserId']?.toString(),
+      aiPrompt: jobJson?['Prompt']?.toString(),
     );
   }
+}
+
+enum OrderKind { product, aiDesign, custom }
+
+/// What a list row shows for an order: a title, an optional picture, and
+/// which kind of order it is.
+class OrderDisplay {
+  final OrderKind kind;
+  final String title;
+  final String? imageUrl;
+
+  const OrderDisplay({required this.kind, required this.title, this.imageUrl});
 }
 
 class OrderShippingAddress {
@@ -263,7 +295,65 @@ class PhysicalOrder {
 
   PhysicalOrderItem? get primaryItem => items.isEmpty ? null : items.first;
 
+  /// Title + picture for a list row, covering all three ways an order is
+  /// made: a marketplace product, a customer's own AI design, or a
+  /// custom/manual order (named only in its notes, no picture).
+  ///
+  /// [customerUserId] is the ordering customer's User.Id. Older custom
+  /// orders were saved with an unrelated placeholder AI model; a model whose
+  /// job belongs to someone else is therefore treated as a custom order.
+  OrderDisplay display({String? customerUserId}) {
+    final item = primaryItem;
+    final product = item?.product;
+    if (product != null) {
+      final thumb = product.thumbnailUrl;
+      return OrderDisplay(
+        kind: OrderKind.product,
+        title: product.name,
+        imageUrl: thumb != null && thumb.isNotEmpty ? thumb : null,
+      );
+    }
+
+    final model = item?.aiModel;
+    final owner = item?.aiOwnerUserId;
+    final isOwnDesign = model != null &&
+        (owner == null || customerUserId == null || owner.toLowerCase() == customerUserId.toLowerCase());
+    if (isOwnDesign) {
+      final prompt = item?.aiPrompt?.trim();
+      final title = prompt != null && prompt.isNotEmpty
+          ? prompt
+          : model.modelName.trim().isNotEmpty
+              ? model.modelName.trim()
+              : 'Desain AI';
+      final preview = model.previewUrl;
+      return OrderDisplay(
+        kind: OrderKind.aiDesign,
+        title: title,
+        imageUrl: preview != null && preview.isNotEmpty ? preview : null,
+      );
+    }
+
+    // Custom orders store "itemName - extra notes" (or just the item name).
+    final note = notes?.trim() ?? '';
+    final firstLine = note.split('\n').first;
+    final name = firstLine.split(' - ').first.trim();
+    return OrderDisplay(kind: OrderKind.custom, title: name.isNotEmpty ? name : 'Pesanan Custom');
+  }
+
   bool get isPriced => (totalAmount ?? 0) > 0;
+
+  /// e.g. "Diskon Tier Gold (10%)" — derived from the stored amounts, so it
+  /// names the tier discount actually applied when the order was priced
+  /// (mirrors tierDiscountLabel in the backend's userTierHelper).
+  String get tierDiscountLabel {
+    final discount = discountAmount ?? 0;
+    final subtotal = subtotalAmount ?? 0;
+    if (discount <= 0 || subtotal <= 0) return 'Diskon Tier';
+    final percent = (discount / subtotal * 100).round();
+    const names = {5: 'Silver', 10: 'Gold', 20: 'Platinum', 30: 'Solitaire'};
+    final name = names[percent];
+    return name != null ? 'Diskon Tier $name ($percent%)' : 'Diskon Tier ($percent%)';
+  }
 
   bool get isPaid => payments.any((p) => p.isPaid);
 

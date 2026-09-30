@@ -201,6 +201,11 @@ class _OrderLinkCard extends StatelessWidget {
     final orderNumber = extraData['orderNumber']?.toString() ?? 'Pesanan';
     final totalAmount = extraData['totalAmount'];
     final totalLabel = totalAmount is num ? _rupiah(totalAmount.toInt()) : null;
+    // title/thumbnailPath are only on cards sent after they were added —
+    // older ORDER_LINK messages fall back to the order number + icon.
+    final title = extraData['title']?.toString();
+    final hasTitle = title != null && title.trim().isNotEmpty;
+    final thumbnailPath = extraData['thumbnailPath']?.toString();
 
     return Material(
       color: Colors.transparent,
@@ -217,14 +222,19 @@ class _OrderLinkCard extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  gradient: AppColors.brandGradientSoft,
-                  borderRadius: BorderRadius.circular(10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: thumbnailPath != null && thumbnailPath.isNotEmpty
+                      ? Image.network(
+                          ApiConfig.assetUrl(thumbnailPath),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const _OrderIconFallback(),
+                        )
+                      : const _OrderIconFallback(),
                 ),
-                child: const Icon(Icons.receipt_long_rounded, color: AppColors.purple, size: 20),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -233,11 +243,18 @@ class _OrderLinkCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '#$orderNumber',
+                      hasTitle ? title : '#$orderNumber',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                     ),
+                    if (hasTitle)
+                      Text(
+                        '#$orderNumber',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                      ),
                     if (totalLabel != null)
                       Text(
                         totalLabel,
@@ -263,6 +280,18 @@ class _ThumbFallback extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(gradient: AppColors.brandGradientSoft),
       child: const Icon(Icons.view_in_ar_rounded, size: 20, color: AppColors.purple),
+    );
+  }
+}
+
+class _OrderIconFallback extends StatelessWidget {
+  const _OrderIconFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(gradient: AppColors.brandGradientSoft),
+      child: const Icon(Icons.receipt_long_rounded, color: AppColors.purple, size: 20),
     );
   }
 }

@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 
+import '../models/merchant_queue_status.dart';
 import '../models/product.dart';
 import '../providers/auth_controller.dart';
 import '../providers/chat_controller.dart';
 import '../services/auth_service.dart' show ApiException;
 import '../services/api_config.dart';
 import '../services/chat_service.dart';
+import '../services/merchant_service.dart';
 import '../services/order_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/gradient_button.dart';
+import '../widgets/merchant_queue_badge.dart';
 import 'chat/chat_screen.dart';
 import 'orders/checkout_screen.dart';
 
@@ -31,6 +34,28 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _quantity = 1;
   bool _buying = false;
   bool _openingChat = false;
+
+  /// The seller's print-queue busyness — best-effort; nothing is shown if
+  /// it can't be loaded.
+  MerchantQueueStatus? _sellerQueue;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSellerQueue();
+  }
+
+  Future<void> _loadSellerQueue() async {
+    final sellerId = widget.product.sellerId;
+    final token = context.read<AuthController>().token;
+    if (sellerId == null || sellerId.isEmpty || token == null) return;
+    try {
+      final status = await MerchantService.queueStatus(token: token, merchantId: sellerId);
+      if (mounted) setState(() => _sellerQueue = status);
+    } catch (_) {
+      // Informational only — the product can still be bought.
+    }
+  }
 
   Future<void> _chatWithSeller() async {
     final sellerId = widget.product.sellerId;
@@ -175,6 +200,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ),
               ],
             ),
+            if (_sellerQueue != null && _sellerQueue!.hasPrintQueue) ...[
+              const SizedBox(height: 6),
+              MerchantQueueBadge(status: _sellerQueue!, fontSize: 12.5),
+            ],
             const SizedBox(height: 14),
             Text(
               product.priceLabel,

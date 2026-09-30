@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
 
+import '../models/merchant_queue_status.dart';
 import '../models/nearby_merchant.dart';
 import 'api_client.dart';
 import 'api_config.dart';
@@ -36,5 +37,20 @@ class MerchantService {
     final decoded = decodeApiResponse(res);
     final list = decoded['data'] as List<dynamic>? ?? [];
     return list.map((e) => NearbyMerchant.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// How busy one merchant's print queue is — shown before ordering from
+  /// them (e.g. on a product page). Counts only, never who is queued.
+  static Future<MerchantQueueStatus> queueStatus({required String token, required String merchantId}) async {
+    http.Response res;
+    try {
+      res = await http
+          .get(_uri('/merchants/$merchantId/queue-status'), headers: _headers(token))
+          .timeout(const Duration(seconds: 15));
+    } catch (_) {
+      throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
+    }
+    final decoded = decodeApiResponse(res);
+    return MerchantQueueStatus.fromJson(decoded['data'] as Map<String, dynamic>? ?? const {});
   }
 }

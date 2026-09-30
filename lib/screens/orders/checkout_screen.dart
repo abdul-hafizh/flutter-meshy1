@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -18,8 +20,10 @@ import '../../widgets/gradient_button.dart';
 import '../addresses/address_list_screen.dart';
 import 'order_payment_webview_screen.dart';
 
-/// Address -> berat paket -> cek ongkir (Biteship) -> pilih kurir -> metode
-/// pembayaran -> "Pesan Sekarang". Only reachable once `order.isPriced` (the
+/// Address -> ongkir dicek otomatis (Biteship) -> pilih jenis pengiriman
+/// (Instan / Reguler / Kargo / Internasional) -> pilih kurir -> metode
+/// pembayaran -> "Pesan Sekarang". The package weight is decided by the
+/// merchant (order/product weight) — the customer never enters it. Only reachable once `order.isPriced` (the
 /// merchant has quoted an item price) — enforced both by the caller
 /// (OrderDetailScreen) and by the backend checkout endpoint itself. The
 /// final amount charged is the merchant's item price plus whichever live
@@ -43,12 +47,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   UserAddress? _selectedAddress;
   int? _selectedPaymentMethodId;
 
-  final _weightCtrl = TextEditingController(text: '500');
-
   bool _checkingRates = false;
   String? _ratesError;
   List<ShippingRateOption> _rates = [];
   ShippingRateOption? _selectedRate;
+
+  /// Weight the rates were quoted for, and where it came from (see ShippingQuote).
+  int? _packageWeightGrams;
+  String? _packageWeightSource;
+  bool _destinationHasCoordinates = true;
+  bool _originHasCoordinates = true;
 
   List<ShippingMethodCategory> _catalog = [];
   String? _selectedCategoryType;
@@ -60,12 +68,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   void initState() {
     super.initState();
     _load();
-  }
-
-  @override
-  void dispose() {
-    _weightCtrl.dispose();
-    super.dispose();
   }
 
   String? get _token => context.read<AuthController>().token;
@@ -101,6 +103,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       } catch (_) {
         // ignore
       }
+
+      // Rates are quoted straight away — nothing for the customer to fill in.
+      if (mounted && !_isPickup && _selectedAddress != null) unawaited(_checkRates());
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _loadError = e.message);
@@ -122,18 +127,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _rates = [];
         _selectedRate = null;
       });
+      unawaited(_checkRates());
+    }
+  }
+
+  void _setPickup(bool pickup) {
+    setState(() => _isPickup = pickup);
+    if (!pickup && _rates.isEmpty && !_checkingRates && _selectedAddress != null) {
+      unawaited(_checkRates());
     }
   }
 
   Future<void> _checkRates() async {
     final token = _token;
     final address = _selectedAddress;
-    final weight = int.tryParse(_weightCtrl.text.trim());
     if (token == null || address == null) return;
-    if (weight == null || weight <= 0) {
-      setState(() => _ratesError = 'Berat paket harus lebih dari 0 gram');
-      return;
-    }
 
     setState(() {
       _checkingRates = true;
@@ -144,17 +152,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
 
     try {
-      final rates = await ShippingRateService.checkRates(
+      final quote = await ShippingRateService.checkRates(
         token: token,
         orderId: widget.order.id,
         userAddressId: address.id,
-        packageWeightGrams: weight,
       );
       if (!mounted) return;
-      final grouped = _groupRatesByCategory(rates);
+      final rates = quote.rates;
       setState(() {
         _rates = rates;
-        _selectedCategoryType = grouped.isNotEmpty ? grouped.keys.first : null;
+        // The customer picks the delivery type first (Instan / Reguler / ...),
+        // then the courier within it.
+        _selectedCategoryType = null;
+        _packageWeightGrams = quote.packageWeightGrams;
+        _packageWeightSource = quote.packageWeightSource;
+        _destinationHasCoordinates = quote.destinationHasCoordinates;
+        _originHasCoordinates = quote.originHasCoordinates;
       });
       if (rates.isEmpty) {
         setState(() => _ratesError = 'Tidak ada kurir yang tersedia untuk rute ini.');
@@ -202,6 +215,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   String _categoryLabel(String key) => key == _otherCategoryKey ? 'Lainnya' : shippingCategoryLabel(key);
 
+  /// Why Instan (Gojek/Grab) is missing, when it is — Biteship only quotes
+  /// instant couriers for addresses that have a map pin.
+  String? get _instantHint {
+    if (_groupRatesByCategory(_rates).containsKey('INSTANT_SHIPMENT')) return null;
+    if (!_destinationHasCoordinates) {
+      return 'Pengiriman Instan (Gojek/Grab) butuh titik lokasi alamatmu. Ubah alamat lalu tekan "Gunakan Lokasi Saat Ini" untuk mengaktifkannya.';
+    }
+    if (!_originHasCoordinates) {
+      return 'Pengiriman Instan (Gojek/Grab) belum tersedia karena lokasi toko penjual belum diatur.';
+    }
+    return null;
+  }
+
   bool get _canSubmit =>
       _isPickup
           ? (_selectedPaymentMethodId != null && !_submitting)
@@ -239,7 +265,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           courierCompany: rate.courierCompany,
           courierType: rate.courierType,
           courierServiceName: rate.courierServiceName,
-          packageWeightGrams: int.tryParse(_weightCtrl.text.trim()) ?? 500,
           shippingCost: rate.price,
           shippingMethodId: match?.method.id,
           shippingServiceId: match?.service?.id,
@@ -355,7 +380,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       const SizedBox(height: 10),
                       _DeliveryModeToggle(
                         isPickup: _isPickup,
-                        onChanged: (v) => setState(() => _isPickup = v),
+                        onChanged: _setPickup,
                       ),
                       const SizedBox(height: 22),
                       if (_isPickup) ...[
@@ -395,58 +420,69 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         const SizedBox(height: 10),
                         _AddressSection(address: _selectedAddress, onChange: _pickAddress),
                         const SizedBox(height: 22),
-                        const _SectionTitle('Berat Paket'),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: _weightCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            suffixText: 'gram',
-                            filled: true,
-                            fillColor: AppColors.surface,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColors.border)),
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColors.border)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        OutlinedButton.icon(
-                          onPressed: _selectedAddress == null || _checkingRates ? null : _checkRates,
-                          icon: _checkingRates
-                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                              : const Icon(Icons.local_shipping_outlined, size: 18),
-                          label: Text(_checkingRates ? 'Mengecek ongkos kirim...' : 'Cek Ongkir'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 13),
-                            side: const BorderSide(color: AppColors.purple),
-                            foregroundColor: AppColors.purple,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            minimumSize: const Size(double.infinity, 0),
-                          ),
-                        ),
-                        if (_ratesError != null) ...[
-                          const SizedBox(height: 10),
-                          Text(_ratesError!, style: const TextStyle(fontSize: 12.5, color: Color(0xFFE0453A), fontWeight: FontWeight.w600)),
-                        ],
-                        if (_rates.isNotEmpty) ...[
+                        if (_packageWeightGrams != null) ...[
+                          _PackageWeightNote(grams: _packageWeightGrams!, source: _packageWeightSource),
                           const SizedBox(height: 14),
-                          const _SectionTitle('Kategori Pengiriman'),
+                        ],
+                        if (_checkingRates)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            child: Row(
+                              children: [
+                                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                                SizedBox(width: 10),
+                                Text('Mengecek ongkos kirim...', style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+                              ],
+                            ),
+                          ),
+                        if (_ratesError != null && !_checkingRates) ...[
+                          Text(_ratesError!, style: const TextStyle(fontSize: 12.5, color: Color(0xFFE0453A), fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 8),
+                          OutlinedButton.icon(
+                            onPressed: _selectedAddress == null ? null : _checkRates,
+                            icon: const Icon(Icons.refresh_rounded, size: 18),
+                            label: const Text('Cek Ulang Ongkir'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              side: const BorderSide(color: AppColors.purple),
+                              foregroundColor: AppColors.purple,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              minimumSize: const Size(double.infinity, 0),
+                            ),
+                          ),
+                        ],
+                        if (_rates.isNotEmpty && !_checkingRates) ...[
+                          const _SectionTitle('Jenis Pengiriman'),
                           const SizedBox(height: 10),
                           _ShippingCategoryChips(
                             categories: _groupRatesByCategory(_rates).keys.toList(),
                             selected: _selectedCategoryType,
                             labelOf: _categoryLabel,
-                            onSelect: (key) => setState(() => _selectedCategoryType = key),
+                            onSelect: (key) => setState(() {
+                              if (_selectedCategoryType != key) _selectedRate = null;
+                              _selectedCategoryType = key;
+                            }),
                           ),
+                          if (_instantHint != null) ...[
+                            const SizedBox(height: 10),
+                            _InfoNote(text: _instantHint!),
+                          ],
                           const SizedBox(height: 16),
-                          const _SectionTitle('Pilih Kurir'),
-                          const SizedBox(height: 10),
-                          _ShippingRateList(
-                            rates: _groupRatesByCategory(_rates)[_selectedCategoryType] ?? const [],
-                            selected: _selectedRate,
-                            onSelect: (r) => setState(() => _selectedRate = r),
-                            rupiah: _rupiah,
-                          ),
+                          if (_selectedCategoryType == null)
+                            const Text(
+                              'Pilih jenis pengiriman untuk melihat kurir yang tersedia.',
+                              style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                            )
+                          else ...[
+                            _SectionTitle('Kurir ${_categoryLabel(_selectedCategoryType!)}'),
+                            const SizedBox(height: 10),
+                            _ShippingRateList(
+                              rates: _groupRatesByCategory(_rates)[_selectedCategoryType] ?? const [],
+                              selected: _selectedRate,
+                              onSelect: (r) => setState(() => _selectedRate = r),
+                              rupiah: _rupiah,
+                            ),
+                          ],
                         ],
                       ],
                       const SizedBox(height: 22),
@@ -483,7 +519,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           children: [
                             if (hasBreakdown) ...[
                               _priceRow('Harga Barang', _rupiah(subtotalAmount)),
-                              if (discountAmount > 0) _priceRow('Diskon Tier', '-${_rupiah(discountAmount)}', valueColor: const Color(0xFF1FAA59)),
+                              if (discountAmount > 0) _priceRow(order.tierDiscountLabel, '-${_rupiah(discountAmount)}', valueColor: const Color(0xFF1FAA59)),
                               if (taxAmount != null) _priceRow('PPN', _rupiah(taxAmount)),
                               if (appFeeAmount != null) _priceRow('Biaya Layanan Aplikasi', _rupiah(appFeeAmount)),
                             ] else
@@ -729,3 +765,51 @@ class _ShippingRateList extends StatelessWidget {
   }
 }
 
+
+/// "Berat paket: 500 gram" — read-only; the merchant decides it.
+class _PackageWeightNote extends StatelessWidget {
+  final int grams;
+  final String? source;
+
+  const _PackageWeightNote({required this.grams, this.source});
+
+  @override
+  Widget build(BuildContext context) {
+    final weight = grams >= 1000 && grams % 100 == 0 ? '${(grams / 1000).toStringAsFixed(grams % 1000 == 0 ? 0 : 1)} kg' : '$grams gram';
+    final note = source == 'DEFAULT' ? 'perkiraan standar' : 'ditentukan penjual';
+    return Row(
+      children: [
+        const Icon(Icons.scale_rounded, size: 16, color: AppColors.textSecondary),
+        const SizedBox(width: 6),
+        Text('Berat paket: $weight', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+        Text(' · $note', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+      ],
+    );
+  }
+}
+
+class _InfoNote extends StatelessWidget {
+  final String text;
+
+  const _InfoNote({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline_rounded, size: 16, color: AppColors.purple),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+        ],
+      ),
+    );
+  }
+}

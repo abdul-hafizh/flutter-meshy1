@@ -15,6 +15,7 @@ import '../services/chat_service.dart';
 import '../services/merchant_service.dart';
 import '../services/user_address_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/merchant_queue_badge.dart';
 import 'chat/chat_screen.dart';
 
 /// Caps a title at [maxLength] characters, appending "..." when it's longer
@@ -714,28 +715,7 @@ class _NearbyMerchantTile extends StatelessWidget {
                     ),
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.print_outlined,
-                            size: 13,
-                            color: merchant.hasActiveQueue ? AppColors.orangeDeep : Colors.green,
-                          ),
-                          const SizedBox(width: 3),
-                          Expanded(
-                            child: Text(
-                              merchant.queueLabel,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: merchant.hasActiveQueue ? AppColors.orangeDeep : Colors.green,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                      child: MerchantQueueBadge(status: merchant.queue),
                     ),
                   ],
                 ),
