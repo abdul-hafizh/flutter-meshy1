@@ -107,21 +107,13 @@ class _LoginScreenState extends State<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Center(
-                  child: Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      gradient: AppColors.brandGradient,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.shadowFor(AppColors.purple),
-                          blurRadius: 24,
-                          offset: const Offset(0, 12),
-                        ),
-                      ],
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.asset(
+                      'assets/icon/logo.jpeg',
+                      height: 110,
+                      fit: BoxFit.contain,
                     ),
-                    child: const Icon(Icons.view_in_ar_rounded, color: Colors.white, size: 34),
                   ),
                 ),
                 const SizedBox(height: 18),

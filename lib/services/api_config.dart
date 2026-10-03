@@ -23,6 +23,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ApiConfig {
   ApiConfig._();
 
+  // static const _bootstrapOrigin = 'https://api.petope.id';
   static const _bootstrapOrigin = 'http://localhost:3000';
   static const _prefsKey = 'dynamic_api_origin';
   static const _cacheTtl = Duration(minutes: 5);
@@ -47,6 +48,18 @@ class ApiConfig {
 
   static String get _origin => _forPlatform(_cachedOrigin ?? _bootstrapOrigin);
 
+  static bool _isLoopback(String origin) {
+    final host = Uri.tryParse(origin)?.host;
+    return host == 'localhost' || host == '127.0.0.1' || host == '10.0.2.2';
+  }
+
+  /// Whether a dynamically resolved origin may replace the bootstrap one. A
+  /// loopback address (e.g. a SystemSettings row still saying
+  /// "http://localhost:3000", or one cached on the device from a dev build)
+  /// is only meaningful while the bootstrap itself is local — on a real
+  /// domain it would point the phone at itself and break every request.
+  static bool _acceptable(String origin) => !_isLoopback(origin) || _isLoopback(_bootstrapOrigin);
+
   static String get baseUrl => '$_origin/api';
 
   /// Resolves a backend-relative path (e.g. an uploaded product photo's
@@ -65,7 +78,8 @@ class ApiConfig {
   static Future<void> init() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _cachedOrigin = prefs.getString(_prefsKey);
+      final saved = prefs.getString(_prefsKey);
+      _cachedOrigin = saved != null && _acceptable(saved) ? saved : null;
     } catch (_) {
       // SharedPreferences unavailable — fine, just skip the persisted value.
     }
@@ -86,7 +100,7 @@ class ApiConfig {
 
       final body = jsonDecode(res.body) as Map<String, dynamic>;
       final resolved = (body['data'] as Map<String, dynamic>?)?['baseUrl'] as String?;
-      if (resolved == null || !RegExp(r'^https?://').hasMatch(resolved)) return;
+      if (resolved == null || !RegExp(r'^https?://').hasMatch(resolved) || !_acceptable(resolved)) return;
 
       _cachedOrigin = resolved;
       try {
