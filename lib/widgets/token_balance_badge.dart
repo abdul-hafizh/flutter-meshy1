@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
 /// Small tappable pill showing the user's current AI-credit ("token")
-/// balance — tap navigates to the buy-tokens flow.
+/// balance — tap navigates to the buy-tokens flow (no-op when [onTap] is null).
 class TokenBalanceBadge extends StatelessWidget {
   final int credits;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
-  const TokenBalanceBadge({super.key, required this.credits, required this.onTap});
+  const TokenBalanceBadge({super.key, required this.credits, this.onTap});
 
   @override
   Widget build(BuildContext context) {

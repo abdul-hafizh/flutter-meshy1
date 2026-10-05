@@ -12,6 +12,7 @@ import '../theme/app_theme.dart';
 import '../widgets/category_tile.dart';
 import '../widgets/gradient_button.dart';
 import '../widgets/token_balance_badge.dart';
+import '../config/features.dart';
 import 'buy_tokens_screen.dart';
 
 enum _CreateMode { text, image }
@@ -113,12 +114,14 @@ class _CreateScreenState extends State<CreateScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Token tidak cukup. Butuh $_kGenerationCost token, kamu punya $credits.'),
-          action: SnackBarAction(
-            label: 'Beli Token',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const BuyTokensScreen()),
-            ),
-          ),
+          action: kTokenPurchaseEnabled
+              ? SnackBarAction(
+                  label: 'Beli Token',
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const BuyTokensScreen()),
+                  ),
+                )
+              : null,
         ),
       );
       return;
@@ -214,9 +217,11 @@ class _CreateScreenState extends State<CreateScreen> {
               ),
               TokenBalanceBadge(
                 credits: credits,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const BuyTokensScreen()),
-                ),
+                onTap: kTokenPurchaseEnabled
+                    ? () => Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const BuyTokensScreen()),
+                        )
+                    : null,
               ),
             ],
           ),

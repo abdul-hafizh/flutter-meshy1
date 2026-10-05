@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../widgets/product_card.dart';
 import '../widgets/section_header.dart';
 import '../widgets/token_balance_badge.dart';
+import '../config/features.dart';
 import 'buy_tokens_screen.dart';
 import 'chat/chat_list_screen.dart';
 import 'product_detail_screen.dart';
@@ -90,9 +91,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   TokenBalanceBadge(
                     credits: user?.credits ?? 0,
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const BuyTokensScreen()),
-                    ),
+                    onTap: kTokenPurchaseEnabled
+                        ? () => Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => const BuyTokensScreen()),
+                            )
+                        : null,
                   ),
                   const SizedBox(width: 10),
                   GestureDetector(

@@ -23,8 +23,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ApiConfig {
   ApiConfig._();
 
-  // static const _bootstrapOrigin = 'https://api.petope.id';
-  static const _bootstrapOrigin = 'http://localhost:3000';
+  static const _bootstrapOrigin = 'https://api.petope.id';
   static const _prefsKey = 'dynamic_api_origin';
   static const _cacheTtl = Duration(minutes: 5);
 
