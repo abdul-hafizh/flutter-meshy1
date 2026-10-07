@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only (overrides src/main's file of the same name): allow
+     plain http everywhere so the app can reach a local backend such as
+     http://10.0.2.2:3000. Once a networkSecurityConfig exists, Android
+     ignores android:usesCleartextTraffic, so this file replaces it. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

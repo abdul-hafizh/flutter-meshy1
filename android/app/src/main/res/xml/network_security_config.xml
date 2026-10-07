@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Release builds block cleartext (http://) traffic. The 3D viewer
+     (model_viewer_plus) serves its page from a tiny HTTP server inside the
+     app at 127.0.0.1, so plain http is allowed for the device's own loopback
+     only — every real network request still has to use HTTPS. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>
