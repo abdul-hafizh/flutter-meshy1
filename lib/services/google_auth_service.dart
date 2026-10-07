@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 /// Thin wrapper around `google_sign_in` that hands back the Google ID
@@ -42,9 +43,32 @@ class GoogleAuthService {
       final account = await _instance.authenticate();
       return account.authentication.idToken;
     } on GoogleSignInException catch (e) {
-      if (e.code == GoogleSignInExceptionCode.canceled) return null;
+      // Android's Credential Manager also reports "canceled" when the app's
+      // signing certificate (SHA-1) isn't registered for this package in
+      // Google Cloud — after the user already picked an account ("[16]
+      // Account reauth failed"). Only a plain cancel stays silent.
+      if (e.code == GoogleSignInExceptionCode.canceled && !_isConfigFailure(e)) return null;
       rethrow;
     }
+  }
+
+  static bool _isConfigFailure(GoogleSignInException e) {
+    final text = '${e.description ?? ''} ${e.details ?? ''}'.toLowerCase();
+    return text.contains('reauth') || text.contains('[16]') || text.contains('developer_error') || text.contains('[10]');
+  }
+
+  /// User-facing message for a failed sign-in.
+  static String describeError(GoogleSignInException e) {
+    debugPrint('Google sign-in failed: ${e.code} ${e.description} ${e.details}');
+    if (e.code == GoogleSignInExceptionCode.canceled ||
+        e.code == GoogleSignInExceptionCode.clientConfigurationError ||
+        e.code == GoogleSignInExceptionCode.providerConfigurationError) {
+      return 'Masuk dengan Google gagal: konfigurasi aplikasi belum sesuai. Silakan masuk dengan email & password dulu.';
+    }
+    if (e.code == GoogleSignInExceptionCode.uiUnavailable) {
+      return 'Masuk dengan Google tidak tersedia di perangkat ini.';
+    }
+    return 'Masuk dengan Google gagal. Coba lagi.';
   }
 
   static Future<void> signOut() async {

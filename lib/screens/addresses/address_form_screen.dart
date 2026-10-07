@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 
@@ -7,6 +8,7 @@ import '../../models/user_address.dart';
 import '../../providers/auth_controller.dart';
 import '../../services/auth_service.dart' show ApiException;
 import '../../services/location_service.dart';
+import '../../services/region_matcher.dart';
 import '../../services/user_address_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/gradient_button.dart';
@@ -163,12 +165,104 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
         _latitude = pos.latitude;
         _longitude = pos.longitude;
       });
+      final filled = await _fillFromCoordinates(pos.latitude, pos.longitude);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(filled
+              ? 'Titik lokasi tersimpan dan alamat terisi otomatis. Periksa kembali sebelum menyimpan.'
+              : 'Titik lokasi tersimpan, tapi alamat tidak bisa dideteksi otomatis. Silakan isi manual.'),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e is String ? e : 'Gagal mengambil lokasi. Coba lagi.');
     } finally {
       if (mounted) setState(() => _locating = false);
     }
+  }
+
+  /// Reverse-geocodes the picked point and fills whatever the customer hasn't
+  /// typed yet: the street address and postal code (only when empty) and the
+  /// country/province/city pickers (matched by name against the backend's
+  /// regions). Returns whether anything could be filled.
+  Future<bool> _fillFromCoordinates(double lat, double lng) async {
+    final token = _token;
+    if (token == null) return false;
+
+    Placemark? place;
+    try {
+      final marks = await Geocoding()
+          .placemarkFromCoordinates(lat, lng, locale: const Locale('id', 'ID'))
+          .timeout(const Duration(seconds: 15));
+      if (marks.isNotEmpty) place = marks.first;
+    } catch (_) {
+      return false;
+    }
+    if (place == null || !mounted) return false;
+
+    var filledAny = false;
+
+    if (_addressCtrl.text.trim().isEmpty) {
+      final line = _addressLine(place);
+      if (line.isNotEmpty) {
+        _addressCtrl.text = line;
+        filledAny = true;
+      }
+    }
+    final postal = place.postalCode?.trim() ?? '';
+    if (_postalCodeCtrl.text.trim().isEmpty && postal.isNotEmpty) {
+      _postalCodeCtrl.text = postal;
+      filledAny = true;
+    }
+
+    try {
+      final countryId = RegionMatcher.country(_countries, name: place.country, isoCode: place.isoCountryCode);
+      if (countryId == null) {
+        if (mounted) setState(() {});
+        return filledAny;
+      }
+      final provinces = countryId == _countryId && _provinces.isNotEmpty
+          ? _provinces
+          : await LocationService.listProvinces(token: token, countryId: countryId);
+      final provinceId = RegionMatcher.province(provinces, place.administrativeArea);
+      var cities = <CityRef>[];
+      int? cityId;
+      if (provinceId != null) {
+        cities = provinceId == _provinceId && _cities.isNotEmpty
+            ? _cities
+            : await LocationService.listCities(token: token, provinceId: provinceId);
+        cityId = RegionMatcher.city(cities, [place.subAdministrativeArea, place.locality]);
+      }
+      if (!mounted) return filledAny;
+      setState(() {
+        _countryId = countryId;
+        _provinces = provinces;
+        _provinceId = provinceId;
+        _cities = cities;
+        _cityId = cityId;
+      });
+      return true;
+    } catch (_) {
+      // Region lists failed to load — keep whatever text was filled.
+      if (mounted) setState(() {});
+      return filledAny;
+    }
+  }
+
+  /// "Jl. Merdeka No. 1, Kel. Sukajadi, Kec. Sukasari" style line from the
+  /// geocoder's street → kelurahan → kecamatan fields, skipping blanks,
+  /// duplicates and plus codes ("8Q7X+2V").
+  static String _addressLine(Placemark p) {
+    final plusCode = RegExp(r'^[A-Z0-9]{4,}\+[A-Z0-9]*');
+    final parts = <String>[];
+    for (final raw in [p.street, p.name, p.subLocality, p.locality]) {
+      final v = raw?.trim() ?? '';
+      if (v.isEmpty || plusCode.hasMatch(v)) continue;
+      if (parts.any((x) => x.toLowerCase().contains(v.toLowerCase()))) continue;
+      parts.add(v);
+    }
+    return parts.join(', ');
   }
 
   Future<void> _save() async {
@@ -294,6 +388,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                 )
               else ...[
                 DropdownButtonFormField<int>(
+                  key: ValueKey('country-$_countryId'),
                   initialValue: _countryId,
                   decoration: _decoration('Negara'),
                   items: [
@@ -303,6 +398,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
+                  key: ValueKey('province-$_countryId-$_provinceId'),
                   initialValue: _provinceId,
                   decoration: _decoration('Provinsi'),
                   items: [
@@ -312,6 +408,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
+                  key: ValueKey('city-$_provinceId-$_cityId'),
                   initialValue: _cityId,
                   decoration: _decoration('Kota/Kabupaten'),
                   items: [

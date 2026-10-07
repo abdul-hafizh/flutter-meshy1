@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:provider/provider.dart';
+import 'package:stream_chat_flutter/stream_chat_flutter.dart' show Channel;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/ai_job.dart';
@@ -13,6 +14,8 @@ import '../services/ai_job_service.dart';
 import '../services/auth_service.dart' show ApiException;
 import '../services/chat_service.dart';
 import '../services/merchant_service.dart';
+import '../services/order_link_service.dart';
+import '../services/order_service.dart';
 import '../services/user_address_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/merchant_queue_badge.dart';
@@ -139,6 +142,8 @@ class _JobDetailViewState extends State<JobDetailView> {
         prompt: _detail?.prompt,
       );
       final channel = client.channel(info.channelType, id: info.channelId);
+      final orderId = info.orderId;
+      if (orderId != null) await _shareOrderLink(channel, token, orderId);
       if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => ChatScreen(client: client, channel: channel)),
@@ -155,6 +160,22 @@ class _JobDetailViewState extends State<JobDetailView> {
       );
     } finally {
       if (mounted) setState(() => _openingChatMerchantId = null);
+    }
+  }
+
+  /// Posts this design's order into the merchant chat, so the merchant sees
+  /// right away which order the customer means instead of searching for it.
+  /// Only once per order (reopening the chat via "Chat" doesn't repeat it).
+  /// Best-effort — if it fails, the chat still opens.
+  Future<void> _shareOrderLink(Channel channel, String token, String orderId) async {
+    final customerUserId = context.read<AuthController>().user?.id;
+    try {
+      if (channel.state == null) await channel.watch();
+      if (OrderLinkService.alreadyShared(channel, orderId)) return;
+      final order = await OrderService.getById(token: token, orderId: orderId);
+      await OrderLinkService.send(channel, order, customerUserId: customerUserId, skipIfAlreadyShared: true);
+    } catch (_) {
+      // The customer can still send it manually from the chat's order button.
     }
   }
 

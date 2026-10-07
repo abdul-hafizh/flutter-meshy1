@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import '../models/app_user.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
+import 'package:google_sign_in/google_sign_in.dart' show GoogleSignInException;
+
 import '../services/google_auth_service.dart';
 import '../services/session_store.dart';
 
@@ -76,6 +78,8 @@ class AuthController extends ChangeNotifier {
       return await _completeGoogleLogin(idToken);
     } on ApiException catch (e) {
       return e.message;
+    } on GoogleSignInException catch (e) {
+      return GoogleAuthService.describeError(e);
     } catch (_) {
       return 'Terjadi kesalahan tak terduga. Coba lagi.';
     } finally {

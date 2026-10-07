@@ -39,12 +39,18 @@ class ChatChannelInfo {
   final String channelId;
   final String channelType;
 
-  const ChatChannelInfo({required this.channelId, required this.channelType});
+  /// The physical order tied to this chat, when it was opened for an AI
+  /// design (the backend creates/reuses it when a merchant is picked).
+  final String? orderId;
+
+  const ChatChannelInfo({required this.channelId, required this.channelType, this.orderId});
 
   factory ChatChannelInfo.fromJson(Map<String, dynamic> json) {
+    final orderId = json['orderId']?.toString();
     return ChatChannelInfo(
       channelId: json['channelId']?.toString() ?? '',
       channelType: json['channelType']?.toString() ?? 'messaging',
+      orderId: orderId != null && orderId.isNotEmpty ? orderId : null,
     );
   }
 }

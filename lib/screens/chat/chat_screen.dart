@@ -6,6 +6,7 @@ import '../../models/physical_order.dart';
 import '../../providers/auth_controller.dart';
 import '../../services/api_config.dart';
 import '../../services/auth_service.dart' show ApiException;
+import '../../services/order_link_service.dart';
 import '../../services/order_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/chat/link_attachment_builders.dart';
@@ -91,33 +92,11 @@ class _ChatScreenState extends State<ChatScreen> {
     );
     if (order == null || !mounted) return;
 
-    // Snapshot the order's title + picture into the message itself (like
-    // PRODUCT_LINK's thumbnailPath), so both apps can render the card
-    // without fetching the order.
-    final display = order.display(customerUserId: context.read<AuthController>().user?.id);
+    final customerUserId = context.read<AuthController>().user?.id;
 
     setState(() => _sendingOrderLink = true);
     try {
-      final channel = widget.channel;
-      if (channel.state == null) await channel.watch();
-      await channel.sendMessage(
-        Message(
-          text: '🔗 Pesanan #${order.orderNumber ?? order.id}',
-          attachments: [
-            Attachment(
-              type: 'ORDER_LINK',
-              uploadState: const UploadState.success(),
-              extraData: {
-                'orderId': order.id,
-                'orderNumber': order.orderNumber,
-                'totalAmount': order.totalAmount,
-                'title': display.title,
-                'thumbnailPath': display.imageUrl,
-              },
-            ),
-          ],
-        ),
-      );
+      await OrderLinkService.send(widget.channel, order, customerUserId: customerUserId);
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
