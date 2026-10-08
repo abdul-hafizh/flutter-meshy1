@@ -82,7 +82,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     try {
       final results = await Future.wait([
         UserAddressService.listMine(token: token),
-        PaymentMethodService.listMidtransMethods(token: token),
+        PaymentMethodService.listDokuMethods(token: token),
       ]);
       final addresses = results[0] as List<UserAddress>;
       final paymentMethods = results[1] as List<PaymentMethodOption>;
@@ -271,7 +271,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         );
       }
 
-      final payment = await OrderPaymentService.createSnapToken(
+      final payment = await OrderPaymentService.createCheckout(
         token: token,
         orderId: widget.order.id,
         paymentMethodId: _selectedPaymentMethodId,

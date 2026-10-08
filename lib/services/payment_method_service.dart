@@ -14,10 +14,10 @@ class PaymentMethodService {
         'Authorization': 'Bearer $token',
       };
 
-  /// Only `Provider == 'Midtrans'` methods are returned — the "Manual
+  /// Only `Provider == 'DOKU'` methods are returned — the "Manual
   /// Transfer" rows have no proof-of-payment/verification flow implemented
   /// anywhere in the backend, so surfacing them would be a dead end.
-  static Future<List<PaymentMethodOption>> listMidtransMethods({required String token}) async {
+  static Future<List<PaymentMethodOption>> listDokuMethods({required String token}) async {
     http.Response res;
     try {
       res = await http.get(_uri('/payment-methods?limit=100'), headers: _headers(token)).timeout(const Duration(seconds: 20));
@@ -28,7 +28,7 @@ class PaymentMethodService {
     final list = decoded['data'] as List<dynamic>? ?? [];
     return list
         .map((e) => PaymentMethodOption.fromJson(e as Map<String, dynamic>))
-        .where((m) => m.provider == 'Midtrans')
+        .where((m) => m.provider == 'DOKU' && m.isActive)
         .toList();
   }
 }

@@ -97,7 +97,7 @@ class PaymentStatusResult {
   bool get isFailed => const {'CANCELLED', 'EXPIRED', 'FAILED'}.contains(localStatus);
 }
 
-/// AI-credit ("token") purchases via Midtrans. Every call requires the
+/// AI-credit ("token") purchases via DOKU Checkout. Every call requires the
 /// logged-in user's bearer token — same explicit-token pattern as
 /// [AiJobService].
 class AiCreditService {
@@ -195,8 +195,8 @@ class AiCreditService {
   }
 
   /// Polling this also drives crediting on the backend (see
-  /// `GET /payments/:id/midtrans-status`) — calling it is what makes the
-  /// balance update even without a public webhook reachable from Midtrans.
+  /// `GET /payments/:id/gateway-status`) — calling it is what makes the
+  /// balance update even without a public notification URL reachable from DOKU.
   static Future<PaymentStatusResult> checkStatus({
     required String token,
     required String paymentId,
@@ -204,7 +204,7 @@ class AiCreditService {
     http.Response res;
     try {
       res = await http
-          .get(_uri('/payments/$paymentId/midtrans-status'), headers: _headers(token))
+          .get(_uri('/payments/$paymentId/gateway-status'), headers: _headers(token))
           .timeout(const Duration(seconds: 15));
     } catch (_) {
       throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
@@ -214,7 +214,7 @@ class AiCreditService {
     final data = decoded['data'] as Map<String, dynamic>;
     return PaymentStatusResult(
       localStatus: data['localStatus']?.toString(),
-      transactionStatus: data['transaction_status']?.toString(),
+      transactionStatus: data['transactionStatus']?.toString(),
     );
   }
 }

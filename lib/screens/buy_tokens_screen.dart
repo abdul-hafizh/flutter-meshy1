@@ -28,7 +28,7 @@ class _BuyTokensScreenState extends State<BuyTokensScreen> {
 
   /// On Android, tokens are sold through Google Play Billing (Play policy for
   /// digital goods) — packages and prices come from Play Console. Other
-  /// platforms keep the Midtrans flow.
+  /// platforms keep the DOKU flow.
   final bool _usePlay = PlayBillingService.isSupported;
   bool _loadingProducts = false;
   List<ProductDetails> _playProducts = const [];

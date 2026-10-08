@@ -21,9 +21,9 @@ class OrderPaymentResult {
   });
 }
 
-/// Generates the Midtrans Snap transaction for an already-checked-out
-/// physical order. Status polling reuses `AiCreditService.checkStatus` —
-/// `GET /payments/:id/midtrans-status` is generic to any [Payment], nothing
+/// Creates the DOKU Checkout page for an already-checked-out physical order.
+/// Status polling reuses `AiCreditService.checkStatus` —
+/// `GET /payments/:id/gateway-status` is generic to any [Payment], nothing
 /// AI-credit-specific about it despite that class's name.
 class OrderPaymentService {
   OrderPaymentService._();
@@ -35,7 +35,7 @@ class OrderPaymentService {
         'Authorization': 'Bearer $token',
       };
 
-  static Future<OrderPaymentResult> createSnapToken({
+  static Future<OrderPaymentResult> createCheckout({
     required String token,
     required String orderId,
     int? paymentMethodId,
@@ -44,7 +44,7 @@ class OrderPaymentService {
     try {
       res = await http
           .post(
-            _uri('/payments/snap-token'),
+            _uri('/payments/checkout'),
             headers: _headers(token),
             body: jsonEncode({
               'OrderId': orderId,

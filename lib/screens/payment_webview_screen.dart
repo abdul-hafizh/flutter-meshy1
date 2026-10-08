@@ -9,7 +9,7 @@ import '../services/ai_credit_service.dart';
 import '../services/auth_service.dart' show ApiException;
 import '../theme/app_theme.dart';
 
-/// Embeds Midtrans's Snap payment page so the user can pick a payment
+/// Embeds the DOKU Checkout payment page so the user can pick a payment
 /// method (VA, QRIS, e-wallet, ...) without leaving the app. While open, it
 /// polls the payment status in the background — that poll is also what
 /// grants the AI credits server-side (see AiCreditService.checkStatus).

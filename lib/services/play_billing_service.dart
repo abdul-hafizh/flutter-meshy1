@@ -33,7 +33,7 @@ class PlayBillingFailed extends PlayBillingEvent {
 }
 
 /// AI-token purchases through Google Play Billing (Android only — Play
-/// policy requires it for digital goods; Midtrans stays for physical orders).
+/// policy requires it for digital goods; DOKU stays for physical orders).
 ///
 /// Flow: the app buys a `token_<n>` product, sends the purchase token to the
 /// backend (`POST /ai-credits/google-play/verify`), which checks it with

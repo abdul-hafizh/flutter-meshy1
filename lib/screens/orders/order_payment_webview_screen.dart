@@ -9,11 +9,11 @@ import '../../services/ai_credit_service.dart';
 import '../../services/auth_service.dart' show ApiException;
 import '../../theme/app_theme.dart';
 
-/// Embeds Midtrans's Snap payment page for a physical-order payment.
+/// Embeds the DOKU Checkout payment page for a physical-order payment.
 /// Same pattern as `PaymentWebViewScreen` (AI-credit purchases), generalized
 /// to pop with a plain success flag instead of an AI-credit-specific message.
 /// Status polling reuses `AiCreditService.checkStatus` — the underlying
-/// endpoint (`GET /payments/:id/midtrans-status`) is generic to any payment.
+/// endpoint (`GET /payments/:id/gateway-status`) is generic to any payment.
 class OrderPaymentWebViewScreen extends StatefulWidget {
   final String redirectUrl;
   final String paymentId;
