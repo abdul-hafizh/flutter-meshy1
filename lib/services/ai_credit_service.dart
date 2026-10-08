@@ -70,6 +70,23 @@ class TokenHistoryPage {
   const TokenHistoryPage({required this.balance, required this.items, required this.hasMore});
 }
 
+class GooglePlayVerifyResult {
+  /// Tokens are on the account (now, or from an earlier send of the same purchase).
+  final bool credited;
+
+  /// Google is still waiting for the payment (e.g. pay-at-store methods).
+  final bool pending;
+  final int quantity;
+  final int balance;
+
+  const GooglePlayVerifyResult({
+    required this.credited,
+    required this.pending,
+    required this.quantity,
+    required this.balance,
+  });
+}
+
 class PaymentStatusResult {
   final String? localStatus;
   final String? transactionStatus;
@@ -119,6 +136,37 @@ class AiCreditService {
       redirectUrl: data['redirectUrl']?.toString() ?? '',
       amount: data['amount'] is int ? data['amount'] as int : int.tryParse('${data['amount']}') ?? 0,
       quantity: data['quantity'] is int ? data['quantity'] as int : int.tryParse('${data['quantity']}') ?? quantity,
+    );
+  }
+
+  /// Hands a Google Play purchase to the backend, which checks it with
+  /// Google and credits the tokens (once — resending is safe).
+  static Future<GooglePlayVerifyResult> verifyGooglePlay({
+    required String token,
+    required String productId,
+    required String purchaseToken,
+  }) async {
+    http.Response res;
+    try {
+      res = await http
+          .post(
+            _uri('/ai-credits/google-play/verify'),
+            headers: _headers(token),
+            body: jsonEncode({'productId': productId, 'purchaseToken': purchaseToken}),
+          )
+          .timeout(const Duration(seconds: 30));
+    } catch (_) {
+      throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
+    }
+
+    final decoded = decodeApiResponse(res);
+    final data = decoded['data'] as Map<String, dynamic>? ?? const {};
+    int asInt(dynamic v) => v is int ? v : int.tryParse('$v') ?? 0;
+    return GooglePlayVerifyResult(
+      credited: decoded['success'] == true,
+      pending: decoded['pending'] == true,
+      quantity: asInt(data['quantity']),
+      balance: asInt(data['balance']),
     );
   }
 

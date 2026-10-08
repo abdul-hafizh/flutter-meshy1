@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:in_app_purchase/in_app_purchase.dart' show ProductDetails;
 import 'package:provider/provider.dart';
 
 import '../models/token_package.dart';
 import '../providers/auth_controller.dart';
 import '../services/ai_credit_service.dart';
 import '../services/auth_service.dart' show ApiException;
+import '../services/play_billing_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/gradient_button.dart';
 import 'payment_webview_screen.dart';
@@ -22,7 +26,99 @@ class _BuyTokensScreenState extends State<BuyTokensScreen> {
   bool _submitting = false;
   String? _error;
 
+  /// On Android, tokens are sold through Google Play Billing (Play policy for
+  /// digital goods) — packages and prices come from Play Console. Other
+  /// platforms keep the Midtrans flow.
+  final bool _usePlay = PlayBillingService.isSupported;
+  bool _loadingProducts = false;
+  List<ProductDetails> _playProducts = const [];
+  String? _selectedProductId;
+  StreamSubscription<PlayBillingEvent>? _playEvents;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_usePlay) {
+      _playEvents = PlayBillingService.instance.events.listen(_onPlayEvent);
+      _loadPlayProducts();
+    }
+  }
+
+  @override
+  void dispose() {
+    _playEvents?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadPlayProducts() async {
+    setState(() {
+      _loadingProducts = true;
+      _error = null;
+    });
+    try {
+      final products = await PlayBillingService.instance.loadProducts();
+      if (!mounted) return;
+      setState(() {
+        _playProducts = products;
+        _selectedProductId = products.isNotEmpty ? products.first.id : null;
+        if (products.isEmpty) {
+          _error = 'Paket token belum tersedia. Pastikan aplikasi di-install dari Google Play.';
+        }
+      });
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Gagal memuat paket token dari Google Play.');
+    } finally {
+      if (mounted) setState(() => _loadingProducts = false);
+    }
+  }
+
+  void _onPlayEvent(PlayBillingEvent event) {
+    if (!mounted) return;
+    switch (event) {
+      case PlayBillingCredited(:final quantity):
+        setState(() => _submitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$quantity token berhasil ditambahkan.')),
+        );
+      case PlayBillingPending():
+        setState(() {
+          _submitting = false;
+          _error = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Pembayaran sedang diproses Google Play. Token masuk otomatis setelah lunas.')),
+        );
+      case PlayBillingCanceled():
+        setState(() => _submitting = false);
+      case PlayBillingFailed(:final message):
+        setState(() {
+          _submitting = false;
+          _error = message;
+        });
+    }
+  }
+
+  Future<void> _buyWithPlay() async {
+    final product = _playProducts.where((p) => p.id == _selectedProductId).firstOrNull;
+    if (product == null) return;
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await PlayBillingService.instance.buy(product);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _submitting = false;
+          _error = 'Gagal membuka pembayaran Google Play.';
+        });
+      }
+    }
+  }
+
   Future<void> _buy() async {
+    if (_usePlay) return _buyWithPlay();
     final auth = context.read<AuthController>();
     final token = auth.token;
     if (token == null) return;
@@ -131,14 +227,31 @@ class _BuyTokensScreenState extends State<BuyTokensScreen> {
               style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 14),
-            for (final pkg in TokenPackage.all) ...[
-              _PackageCard(
-                package: pkg,
-                selected: pkg.quantity == _selected.quantity,
-                onTap: () => setState(() => _selected = pkg),
-              ),
-              const SizedBox(height: 12),
-            ],
+            if (_usePlay && _loadingProducts)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+              )
+            else if (_usePlay)
+              for (final product in _playProducts) ...[
+                _PackageCard(
+                  quantity: PlayBillingService.quantityOf(product.id),
+                  priceLabel: product.price,
+                  selected: product.id == _selectedProductId,
+                  onTap: () => setState(() => _selectedProductId = product.id),
+                ),
+                const SizedBox(height: 12),
+              ]
+            else
+              for (final pkg in TokenPackage.all) ...[
+                _PackageCard(
+                  quantity: pkg.quantity,
+                  priceLabel: 'Rp${_formatRupiah(pkg.price)}',
+                  selected: pkg.quantity == _selected.quantity,
+                  onTap: () => setState(() => _selected = pkg),
+                ),
+                const SizedBox(height: 12),
+              ],
             if (_error != null) ...[
               const SizedBox(height: 4),
               Container(
@@ -166,8 +279,12 @@ class _BuyTokensScreenState extends State<BuyTokensScreen> {
             GradientButton(
               label: _submitting ? 'Memproses...' : 'Beli Sekarang',
               icon: _submitting ? null : Icons.arrow_forward_rounded,
-              onPressed: _submitting ? null : _buy,
+              onPressed: _submitting || (_usePlay && _selectedProductId == null) ? null : _buy,
             ),
+            if (_usePlay && !_loadingProducts && _playProducts.isEmpty) ...[
+              const SizedBox(height: 10),
+              TextButton(onPressed: _loadPlayProducts, child: const Text('Muat ulang paket')),
+            ],
           ],
         ),
       ),
@@ -175,12 +292,30 @@ class _BuyTokensScreenState extends State<BuyTokensScreen> {
   }
 }
 
+String _formatRupiah(int amount) {
+  final str = amount.toString();
+  final buffer = StringBuffer();
+  for (int i = 0; i < str.length; i++) {
+    if (i > 0 && (str.length - i) % 3 == 0) buffer.write('.');
+    buffer.write(str[i]);
+  }
+  return buffer.toString();
+}
+
 class _PackageCard extends StatelessWidget {
-  final TokenPackage package;
+  final int quantity;
+
+  /// Already formatted — Google Play's localized price, or our Rupiah price.
+  final String priceLabel;
   final bool selected;
   final VoidCallback onTap;
 
-  const _PackageCard({required this.package, required this.selected, required this.onTap});
+  const _PackageCard({
+    required this.quantity,
+    required this.priceLabel,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -219,12 +354,12 @@ class _PackageCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${package.quantity} Token',
+                      '$quantity Token',
                       style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Rp${_formatRupiah(package.price)}',
+                      priceLabel,
                       style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
                     ),
                   ],
@@ -239,15 +374,5 @@ class _PackageCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _formatRupiah(int amount) {
-    final str = amount.toString();
-    final buffer = StringBuffer();
-    for (int i = 0; i < str.length; i++) {
-      if (i > 0 && (str.length - i) % 3 == 0) buffer.write('.');
-      buffer.write(str[i]);
-    }
-    return buffer.toString();
   }
 }

@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- Google Play Billing (AI token purchases). The in_app_purchase plugin
+         also merges this in; declared here so it never silently drops out. -->
+    <uses-permission android:name="com.android.vending.BILLING"/>
     <application
         android:label="Petope"
         android:name="${applicationName}"

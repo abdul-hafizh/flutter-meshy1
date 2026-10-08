@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../providers/auth_controller.dart';
+import '../services/play_billing_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_bottom_nav.dart';
 import 'create_screen.dart';
@@ -17,6 +21,14 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _index = 0;
   final _ordersKey = GlobalKey<OrdersScreenState>();
+
+  @override
+  void initState() {
+    super.initState();
+    // Listens for Google Play token purchases app-wide and finishes any left
+    // unconfirmed by the backend last time (see PlayBillingService).
+    PlayBillingService.instance.start(context.read<AuthController>());
+  }
 
   void _goTo(int i) {
     setState(() => _index = i);
