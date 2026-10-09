@@ -43,7 +43,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   List<PaymentMethodOption> _paymentMethods = [];
 
-  bool _isPickup = false;
+  /// "Ambil di Toko" is the default; courier rates are only quoted once the
+  /// customer switches to "Kirim" (see _setPickup).
+  bool _isPickup = true;
   UserAddress? _selectedAddress;
   int? _selectedPaymentMethodId;
 
