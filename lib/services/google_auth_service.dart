@@ -11,11 +11,12 @@ import 'package:google_sign_in/google_sign_in.dart';
 class GoogleAuthService {
   GoogleAuthService._();
 
-  /// Web OAuth client from the backend's GOOGLE_CLIENT_ID — this is the
-  /// audience the backend checks the ID token against, so it must match
-  /// exactly (see e:\Proyek\api-meshy\.env).
+  /// Web OAuth client of the "Petope" Google Cloud project — the audience
+  /// the backend checks the ID token against, so it must be one of the ids
+  /// listed in the backend's GOOGLE_CLIENT_ID (see e:\Proyek\api-meshy\.env).
+  /// The Android clients (package + SHA-1) live in that same project.
   static const String _serverClientId =
-      '256366208789-ljmm8hj3qlge449bvausg3ka1upak9oe.apps.googleusercontent.com';
+      '904548036546-s6hpm12ms2grtqs0og234nvnlhj4utpf.apps.googleusercontent.com';
 
   static final GoogleSignIn _instance = GoogleSignIn.instance;
   static Future<void>? _initFuture;
