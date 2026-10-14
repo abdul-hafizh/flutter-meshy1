@@ -235,8 +235,12 @@ class _BuyTokensScreenState extends State<BuyTokensScreen> {
             else if (_usePlay)
               for (final product in _playProducts) ...[
                 _PackageCard(
-                  quantity: PlayBillingService.quantityOf(product.id),
-                  priceLabel: product.price,
+                  title: product.id == PlayBillingService.customAmountProductId
+                      ? 'Jumlah Bebas'
+                      : '${PlayBillingService.quantityOf(product.id)} Token',
+                  priceLabel: product.id == PlayBillingService.customAmountProductId
+                      ? '${product.price} per 5 token · atur jumlahnya (kelipatan 5) di layar Google Play'
+                      : product.price,
                   selected: product.id == _selectedProductId,
                   onTap: () => setState(() => _selectedProductId = product.id),
                 ),
@@ -245,7 +249,7 @@ class _BuyTokensScreenState extends State<BuyTokensScreen> {
             else
               for (final pkg in TokenPackage.all) ...[
                 _PackageCard(
-                  quantity: pkg.quantity,
+                  title: '${pkg.quantity} Token',
                   priceLabel: 'Rp${_formatRupiah(pkg.price)}',
                   selected: pkg.quantity == _selected.quantity,
                   onTap: () => setState(() => _selected = pkg),
@@ -303,7 +307,7 @@ String _formatRupiah(int amount) {
 }
 
 class _PackageCard extends StatelessWidget {
-  final int quantity;
+  final String title;
 
   /// Already formatted — Google Play's localized price, or our Rupiah price.
   final String priceLabel;
@@ -311,7 +315,7 @@ class _PackageCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const _PackageCard({
-    required this.quantity,
+    required this.title,
     required this.priceLabel,
     required this.selected,
     required this.onTap,
@@ -354,7 +358,7 @@ class _PackageCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '$quantity Token',
+                      title,
                       style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                     ),
                     const SizedBox(height: 2),

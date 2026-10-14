@@ -4,6 +4,7 @@ import '../data/dummy_data.dart';
 import '../providers/auth_controller.dart';
 import '../providers/chat_controller.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_version_text.dart';
 import 'addresses/address_list_screen.dart';
 import 'edit_profile_screen.dart';
 
@@ -312,6 +313,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               MaterialPageRoute(builder: (_) => const AddressListScreen()),
             ),
           ),
+          const SizedBox(height: 28),
+          const AppVersionText(showBuild: true),
+          const SizedBox(height: 8),
         ],
       ),
     );

@@ -6,6 +6,7 @@ import 'providers/chat_controller.dart';
 import 'screens/auth/auth_gate.dart';
 import 'services/api_config.dart';
 import 'theme/app_theme.dart';
+import 'widgets/update_gate.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,7 +30,8 @@ class SnapyApp extends StatelessWidget {
         title: 'Petope',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
-        home: const AuthGate(),
+        // Blocks the app until a pending Google Play update is installed.
+        home: const UpdateGate(child: AuthGate()),
       ),
     );
   }

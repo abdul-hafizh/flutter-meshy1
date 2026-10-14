@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_controller.dart';
 import '../../services/google_auth_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_version_text.dart';
 import '../../widgets/app_text_field.dart';
 import '../../widgets/google_sign_in_entry.dart';
 import '../../widgets/google_web_button.dart';
@@ -196,6 +197,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 20),
+                const AppVersionText(),
               ],
             ),
           ),

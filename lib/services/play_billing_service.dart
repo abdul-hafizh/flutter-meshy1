@@ -45,7 +45,12 @@ class PlayBillingService {
   static final PlayBillingService instance = PlayBillingService._();
 
   /// Must match the product ids in Play Console → One-time products.
-  static const Set<String> productIds = {'token_30', 'token_50'};
+  /// [customAmountProductId] is sold with multi-quantity enabled: the buyer
+  /// picks how many in Google Play's purchase sheet (the app can't preset it)
+  /// and the backend credits 5 tokens × the quantity Google reports (Play's
+  /// minimum price rules out a 1-token product).
+  static const String customAmountProductId = 'token_5';
+  static const Set<String> productIds = {customAmountProductId, 'token_30', 'token_50'};
 
   static bool get isSupported => !kIsWeb && Platform.isAndroid;
 
@@ -82,7 +87,9 @@ class PlayBillingService {
     if (response.notFoundIDs.isNotEmpty) {
       debugPrint('Play Billing: products not found ${response.notFoundIDs}');
     }
-    final products = [...response.productDetails]..sort((a, b) => quantityOf(a.id).compareTo(quantityOf(b.id)));
+    // Fixed packages smallest first, the free-amount product last.
+    int order(ProductDetails p) => p.id == customAmountProductId ? 1 << 30 : quantityOf(p.id);
+    final products = [...response.productDetails]..sort((a, b) => order(a).compareTo(order(b)));
     return products;
   }
 
