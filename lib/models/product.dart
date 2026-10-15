@@ -1,3 +1,5 @@
+import 'operating_status.dart';
+
 /// A ready-made product a merchant sells directly (already priced, with
 /// stock) — distinct from an [AiModel] job, which is a customer's own custom
 /// 3D-print request. Backed by the backend's `Products` table.
@@ -12,6 +14,9 @@ class Product {
   final String? sellerId;
   final String? sellerName;
   final String? sellerAvatar;
+
+  /// The seller's "jam operasional" state (null = unknown/not sent).
+  final OperatingStatus? sellerStatus;
   final bool isPublished;
 
   const Product({
@@ -25,6 +30,7 @@ class Product {
     this.sellerId,
     this.sellerName,
     this.sellerAvatar,
+    this.sellerStatus,
     this.isPublished = false,
   });
 
@@ -42,6 +48,7 @@ class Product {
       sellerId: seller is Map<String, dynamic> ? seller['Id']?.toString() : json['SellerId']?.toString(),
       sellerName: seller is Map<String, dynamic> ? seller['FullName']?.toString() : null,
       sellerAvatar: seller is Map<String, dynamic> ? seller['Avatar']?.toString() : null,
+      sellerStatus: seller is Map<String, dynamic> ? OperatingStatus.tryParse(seller['OperatingStatus']) : null,
       isPublished: json['IsPublished'] == true || json['IsPublished'] == 1,
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'providers/auth_controller.dart';
+import 'providers/cart_controller.dart';
 import 'providers/chat_controller.dart';
 import 'screens/auth/auth_gate.dart';
 import 'services/api_config.dart';
@@ -25,6 +26,7 @@ class SnapyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthController()),
         ChangeNotifierProvider(create: (_) => ChatController()),
+        ChangeNotifierProvider(create: (_) => CartController()),
       ],
       child: MaterialApp(
         title: 'Petope',

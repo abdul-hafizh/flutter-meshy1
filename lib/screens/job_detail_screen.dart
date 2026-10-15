@@ -17,7 +17,9 @@ import '../services/merchant_service.dart';
 import '../services/order_link_service.dart';
 import '../services/order_service.dart';
 import '../services/user_address_service.dart';
+import '../services/location_gate.dart';
 import '../theme/app_theme.dart';
+import '../widgets/store_status.dart';
 import '../widgets/merchant_queue_badge.dart';
 import 'chat/chat_screen.dart';
 
@@ -182,13 +184,15 @@ class _JobDetailViewState extends State<JobDetailView> {
   /// First-time merchant pick — confirms since it locks the design to that
   /// merchant (server-side, see ChatService.ensureOrderForModel).
   Future<void> _pickMerchant(NearbyMerchant merchant) async {
+    if (!await LocationGate.ensureEnabled(context) || !mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Konfirmasi'),
         content: Text(
           'Pilih ${merchant.fullName.isNotEmpty ? merchant.fullName : 'penjual ini'} untuk membuatkan desain ini? '
-          'Setelah dipilih, kamu tidak bisa memilih merchant lain untuk desain ini.',
+          'Setelah dipilih, kamu tidak bisa memilih merchant lain untuk desain ini.'
+          '${merchant.operatingStatus?.isClosed == true ? '\n\n${merchant.operatingStatus!.closedOrderNotice}' : ''}',
         ),
         actions: [
           TextButton(
@@ -348,6 +352,10 @@ class _JobDetailViewState extends State<JobDetailView> {
                                 _StatusPill(status: detail.status),
                               ],
                             ),
+                            if (detail.primaryModel?.weightLabel != null) ...[
+                              const SizedBox(height: 10),
+                              _WeightEstimateChip(label: detail.primaryModel!.weightLabel!),
+                            ],
                             if (detail.negativePrompt?.isNotEmpty == true) ...[
                               const SizedBox(height: 8),
                               Text(
@@ -457,6 +465,38 @@ class _JobDetailViewState extends State<JobDetailView> {
                         ),
         ),
       ],
+    );
+  }
+}
+
+/// Estimated filament weight of the generated model (AIModel.Weight).
+class _WeightEstimateChip extends StatelessWidget {
+  final String label;
+
+  const _WeightEstimateChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: AppColors.purple.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.scale_outlined, size: 16, color: AppColors.purple),
+            const SizedBox(width: 6),
+            Text(
+              'Estimasi berat $label',
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.purple),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -690,6 +730,10 @@ class _NearbyMerchantTile extends StatelessWidget {
                             ),
                           ),
                         ),
+                        if (merchant.operatingStatus?.isClosed == true) ...[
+                          const SizedBox(width: 6),
+                          StoreStatusBadge(status: merchant.operatingStatus),
+                        ],
                         if (merchant.distanceLabel.isNotEmpty) ...[
                           const SizedBox(width: 6),
                           Text(
@@ -796,6 +840,7 @@ class _AssignedMerchantCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                 ),
+                StoreStatusLine(status: merchant.operatingStatus),
                 const SizedBox(height: 2),
                 Row(
                   children: [

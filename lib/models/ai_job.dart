@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_config.dart';
+import 'operating_status.dart';
 
 class AiJobStatus {
   static const pending = 'PENDING';
@@ -32,6 +33,15 @@ extension AiJobStatusX on String {
 
   bool get isJobFinished =>
       toUpperCase() == AiJobStatus.succeeded || toUpperCase() == AiJobStatus.failed;
+}
+
+double? _toDouble(dynamic v) => v is num ? v.toDouble() : double.tryParse('${v ?? ''}');
+
+/// "± 12,5 gram" — the backend's estimate (AIModel.Weight), null when unknown.
+String? formatGramEstimate(double? grams) {
+  if (grams == null || grams <= 0) return null;
+  final rounded = grams >= 10 ? grams.round().toString() : grams.toStringAsFixed(1).replaceAll('.', ',');
+  return '± $rounded gram';
 }
 
 class AiModelFile {
@@ -69,12 +79,20 @@ class AiModel {
   final String modelName;
   final List<AiModelFile> files;
   final List<AiModelPreview> previews;
+  final double? weightGrams;
+  final double? width;
+  final double? height;
+  final double? depth;
 
   const AiModel({
     required this.id,
     required this.modelName,
     required this.files,
     required this.previews,
+    this.weightGrams,
+    this.width,
+    this.height,
+    this.depth,
   });
 
   factory AiModel.fromJson(Map<String, dynamic> json) {
@@ -87,8 +105,14 @@ class AiModel {
       previews: (json['Previews'] as List<dynamic>? ?? [])
           .map((e) => AiModelPreview.fromJson(e as Map<String, dynamic>))
           .toList(),
+      weightGrams: _toDouble(json['Weight']),
+      width: _toDouble(json['Width']),
+      height: _toDouble(json['Height']),
+      depth: _toDouble(json['Depth']),
     );
   }
+
+  String? get weightLabel => formatGramEstimate(weightGrams);
 
   String? get previewUrl => previews.isEmpty ? null : previews.first.previewPath;
 
@@ -147,6 +171,7 @@ class AssignedMerchantInfo {
   final String? countryName;
   final double? rating;
   final int totalReviews;
+  final OperatingStatus? operatingStatus;
 
   const AssignedMerchantInfo({
     required this.id,
@@ -157,6 +182,7 @@ class AssignedMerchantInfo {
     this.countryName,
     this.rating,
     this.totalReviews = 0,
+    this.operatingStatus,
   });
 
   factory AssignedMerchantInfo.fromJson(Map<String, dynamic> json) {
@@ -175,6 +201,7 @@ class AssignedMerchantInfo {
       totalReviews: json['TotalReviews'] is int
           ? json['TotalReviews'] as int
           : int.tryParse('${json['TotalReviews']}') ?? 0,
+      operatingStatus: OperatingStatus.tryParse(json['OperatingStatus']),
     );
   }
 
@@ -269,6 +296,7 @@ class AiJobSummary {
   final int? progress;
   final String? previewUrl;
   final bool hasModel;
+  final double? weightGrams;
 
   const AiJobSummary({
     required this.id,
@@ -278,7 +306,10 @@ class AiJobSummary {
     this.progress,
     this.previewUrl,
     this.hasModel = false,
+    this.weightGrams,
   });
+
+  String? get weightLabel => formatGramEstimate(weightGrams);
 
   factory AiJobSummary.fromJson(Map<String, dynamic> json) {
     final progress = json['Progress'];
@@ -290,6 +321,7 @@ class AiJobSummary {
       progress: progress is int ? progress : int.tryParse('$progress'),
       previewUrl: json['PreviewUrl']?.toString(),
       hasModel: json['HasModel'] == true,
+      weightGrams: _toDouble(json['Weight']),
     );
   }
 }

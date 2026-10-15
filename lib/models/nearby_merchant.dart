@@ -1,4 +1,5 @@
 import 'merchant_queue_status.dart';
+import 'operating_status.dart';
 
 /// One row from `GET /merchants/nearby` — a merchant candidate the customer
 /// can pick to make their 3D result, with enough location info ("kota,
@@ -21,6 +22,7 @@ class NearbyMerchant {
 
   /// Earliest a printer is free for a new job (null = free now).
   final DateTime? estimatedAvailableAt;
+  final OperatingStatus? operatingStatus;
 
   const NearbyMerchant({
     required this.id,
@@ -38,6 +40,7 @@ class NearbyMerchant {
     this.queueInProgressCount = 0,
     this.queueWaitingCount = 0,
     this.estimatedAvailableAt,
+    this.operatingStatus,
   });
 
   factory NearbyMerchant.fromJson(Map<String, dynamic> json) {
@@ -61,6 +64,7 @@ class NearbyMerchant {
       queueInProgressCount: int.tryParse('${json['QueueInProgressCount']}') ?? 0,
       queueWaitingCount: int.tryParse('${json['QueueWaitingCount']}') ?? 0,
       estimatedAvailableAt: MerchantQueueStatus.parseTime(json['EstimatedAvailableAt']),
+      operatingStatus: OperatingStatus.tryParse(json['OperatingStatus']),
     );
   }
 

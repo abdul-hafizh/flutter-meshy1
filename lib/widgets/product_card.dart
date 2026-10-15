@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/product.dart';
 import '../services/api_config.dart';
 import '../theme/app_theme.dart';
+import 'store_status.dart';
 
 /// Gradient-tinted square placeholder standing in for a product photo —
 /// shown whenever a product has no thumbnail, or its image fails to load.
@@ -83,6 +84,27 @@ class _OutOfStockBadge extends StatelessWidget {
   }
 }
 
+/// "Toko Tutup" tag on a product whose store is outside its operating
+/// hours — it can still be ordered (processed once the store opens).
+class _StoreClosedBadge extends StatelessWidget {
+  const _StoreClosedBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE0453A).withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: const Text(
+        'Toko Tutup',
+        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Colors.white),
+      ),
+    );
+  }
+}
+
 /// Horizontal row-style card used in the Beranda "Produk Siap Checkout" list.
 class TrendingProductTile extends StatelessWidget {
   final Product product;
@@ -123,14 +145,24 @@ class TrendingProductTile extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 3),
-                    Text(
-                      product.sellerName ?? product.categoryName ?? '-',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        color: AppColors.textSecondary,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            product.sellerName ?? product.categoryName ?? '-',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                        if (product.sellerStatus?.isClosed == true) ...[
+                          const SizedBox(width: 6),
+                          StoreStatusBadge(status: product.sellerStatus),
+                        ],
+                      ],
                     ),
                   ],
                 ),
@@ -186,6 +218,8 @@ class MarketProductCard extends StatelessWidget {
                       _ProductImage(product: product, size: double.infinity, radius: 14),
                       if (!product.inStock)
                         const Positioned(bottom: 8, left: 8, child: _OutOfStockBadge()),
+                      if (product.sellerStatus?.isClosed == true)
+                        const Positioned(top: 8, left: 8, child: _StoreClosedBadge()),
                     ],
                   ),
                 ),

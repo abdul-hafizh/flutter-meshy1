@@ -9,6 +9,7 @@ import '../providers/auth_controller.dart';
 import '../services/ai_credit_service.dart';
 import '../services/auth_service.dart' show ApiException;
 import '../services/play_billing_service.dart';
+import '../services/location_gate.dart';
 import '../theme/app_theme.dart';
 import '../widgets/gradient_button.dart';
 import 'payment_webview_screen.dart';
@@ -118,6 +119,7 @@ class _BuyTokensScreenState extends State<BuyTokensScreen> {
   }
 
   Future<void> _buy() async {
+    if (!await LocationGate.ensureEnabled(context) || !mounted) return;
     if (_usePlay) return _buyWithPlay();
     final auth = context.read<AuthController>();
     final token = auth.token;

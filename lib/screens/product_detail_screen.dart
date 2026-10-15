@@ -5,13 +5,18 @@ import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 import '../models/merchant_queue_status.dart';
 import '../models/product.dart';
 import '../providers/auth_controller.dart';
+import '../providers/cart_controller.dart';
 import '../providers/chat_controller.dart';
 import '../services/auth_service.dart' show ApiException;
 import '../services/api_config.dart';
+import '../services/cart_service.dart';
+import '../services/location_gate.dart';
 import '../services/chat_service.dart';
 import '../services/merchant_service.dart';
 import '../services/order_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/cart_icon_button.dart';
+import '../widgets/store_status.dart';
 import '../widgets/gradient_button.dart';
 import '../widgets/merchant_queue_badge.dart';
 import 'chat/chat_screen.dart';
@@ -33,6 +38,7 @@ class ProductDetailScreen extends StatefulWidget {
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _quantity = 1;
   bool _buying = false;
+  bool _addingToCart = false;
   bool _openingChat = false;
 
   /// The seller's print-queue busyness — best-effort; nothing is shown if
@@ -113,6 +119,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Future<void> _buyNow() async {
     final token = context.read<AuthController>().token;
     if (token == null) return;
+    if (!await LocationGate.ensureEnabled(context) || !mounted) return;
     setState(() => _buying = true);
     try {
       final order = await OrderService.createFromProduct(
@@ -129,6 +136,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _buying = false);
+    }
+  }
+
+  Future<void> _addToCart() async {
+    final token = context.read<AuthController>().token;
+    if (token == null) return;
+    setState(() => _addingToCart = true);
+    try {
+      final result = await CartService.add(token: token, productId: widget.product.id, quantity: _quantity);
+      if (!mounted) return;
+      context.read<CartController>().setCount(result.count);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result.message)));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _addingToCart = false);
     }
   }
 
@@ -153,6 +177,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   : const Icon(Icons.chat_bubble_outline_rounded),
               tooltip: 'Chat Penjual',
             ),
+          const Padding(
+            padding: EdgeInsets.only(right: 12, left: 4),
+            child: Center(child: CartIconButton()),
+          ),
         ],
       ),
       body: SafeArea(
@@ -200,6 +228,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ),
               ],
             ),
+            if (product.sellerStatus?.configured == true) ...[
+              const SizedBox(height: 4),
+              StoreStatusLine(status: product.sellerStatus),
+            ],
             if (_sellerQueue != null && _sellerQueue!.hasPrintQueue) ...[
               const SizedBox(height: 6),
               MerchantQueueBadge(status: _sellerQueue!, fontSize: 12.5),
@@ -231,6 +263,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
             ],
             const SizedBox(height: 22),
+            if (product.inStock && product.sellerStatus?.isClosed == true) ...[
+              ClosedStoreNotice(status: product.sellerStatus),
+              const SizedBox(height: 14),
+            ],
             if (product.inStock) ...[
               Row(
                 children: [
@@ -248,12 +284,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
               const SizedBox(height: 18),
             ],
+            if (product.inStock) ...[
+              OutlinedButton.icon(
+                onPressed: _addingToCart || _buying ? null : _addToCart,
+                icon: _addingToCart
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.add_shopping_cart_rounded),
+                label: const Text('Tambah ke Keranjang', style: TextStyle(fontWeight: FontWeight.w700)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.purple,
+                  side: const BorderSide(color: AppColors.purple, width: 1.4),
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  minimumSize: const Size(double.infinity, 0),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
             GradientButton(
               label: _buying
                   ? 'Memproses...'
                   : (product.inStock ? 'Beli Sekarang' : 'Stok Habis'),
               icon: Icons.shopping_bag_outlined,
-              onPressed: product.inStock && !_buying ? _buyNow : null,
+              onPressed: product.inStock && !_buying && !_addingToCart ? _buyNow : null,
             ),
           ],
         ),

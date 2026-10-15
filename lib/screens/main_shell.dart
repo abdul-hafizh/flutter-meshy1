@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_controller.dart';
+import '../providers/cart_controller.dart';
 import '../services/play_billing_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_bottom_nav.dart';
@@ -28,6 +29,8 @@ class _MainShellState extends State<MainShell> {
     // Listens for Google Play token purchases app-wide and finishes any left
     // unconfirmed by the backend last time (see PlayBillingService).
     PlayBillingService.instance.start(context.read<AuthController>());
+    // Cart badge on the home header.
+    context.read<CartController>().refresh(context.read<AuthController>().token);
   }
 
   void _goTo(int i) {

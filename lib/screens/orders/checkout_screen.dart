@@ -15,7 +15,10 @@ import '../../services/order_service.dart';
 import '../../services/payment_method_service.dart';
 import '../../services/shipping_rate_service.dart';
 import '../../services/user_address_service.dart';
+import '../../services/location_gate.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/store_status.dart';
+import '../../widgets/checkout/shipping_widgets.dart';
 import '../../widgets/gradient_button.dart';
 import '../addresses/address_list_screen.dart';
 import 'order_payment_webview_screen.dart';
@@ -185,50 +188,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  static const _otherCategoryKey = 'OTHER';
-  static const _categoryOrder = [
-    'INSTANT_SHIPMENT',
-    'REGULAR_SHIPMENT',
-    'REGULAR_CARGO_SHIPMENT',
-    'INTERNATIONAL_CARGO_SHIPMENT',
-    'INTERNAL_SHIPMENT',
-    _otherCategoryKey,
-  ];
+  Map<String, List<ShippingRateOption>> _groupRatesByCategory(List<ShippingRateOption> rates) =>
+      groupRatesByCategory(rates, _catalog);
 
-  /// Groups live Biteship rates by our shipping catalog's category — a rate
-  /// whose courier isn't in the catalog yet falls under "Lainnya" instead
-  /// of being dropped. Ordered Instant -> Regular -> Cargo -> International
-  /// -> Lainnya, matching how the categories read in the dashboard.
-  Map<String, List<ShippingRateOption>> _groupRatesByCategory(List<ShippingRateOption> rates) {
-    final map = <String, List<ShippingRateOption>>{};
-    for (final rate in rates) {
-      final key = matchRateToCatalog(rate, _catalog)?.method.shippingType ?? _otherCategoryKey;
-      map.putIfAbsent(key, () => []).add(rate);
-    }
-    final ordered = <String, List<ShippingRateOption>>{};
-    for (final key in _categoryOrder) {
-      if (map.containsKey(key)) ordered[key] = map[key]!;
-    }
-    for (final entry in map.entries) {
-      ordered.putIfAbsent(entry.key, () => entry.value);
-    }
-    return ordered;
-  }
+  String _categoryLabel(String key) => rateCategoryLabel(key);
 
-  String _categoryLabel(String key) => key == _otherCategoryKey ? 'Lainnya' : shippingCategoryLabel(key);
-
-  /// Why Instan (Gojek/Grab) is missing, when it is — Biteship only quotes
-  /// instant couriers for addresses that have a map pin.
-  String? get _instantHint {
-    if (_groupRatesByCategory(_rates).containsKey('INSTANT_SHIPMENT')) return null;
-    if (!_destinationHasCoordinates) {
-      return 'Pengiriman Instan (Gojek/Grab) butuh titik lokasi alamatmu. Ubah alamat lalu tekan "Gunakan Lokasi Saat Ini" untuk mengaktifkannya.';
-    }
-    if (!_originHasCoordinates) {
-      return 'Pengiriman Instan (Gojek/Grab) belum tersedia karena lokasi toko penjual belum diatur.';
-    }
-    return null;
-  }
+  String? get _instantHint => instantShippingHint(
+        grouped: _groupRatesByCategory(_rates),
+        destinationHasCoordinates: _destinationHasCoordinates,
+        originHasCoordinates: _originHasCoordinates,
+      );
 
   bool get _canSubmit =>
       _isPickup
@@ -241,6 +210,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _submit() async {
     final token = _token;
     if (token == null || _selectedPaymentMethodId == null) return;
+    if (!await LocationGate.ensureEnabled(context) || !mounted) return;
 
     if (!_isPickup) {
       final address = _selectedAddress;
@@ -378,9 +348,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                     children: [
-                      const _SectionTitle('Metode Pengiriman'),
+                      if (order.merchant?.operatingStatus?.isClosed == true) ...[
+                        ClosedStoreNotice(status: order.merchant!.operatingStatus),
+                        const SizedBox(height: 16),
+                      ],
+                      const CheckoutSectionTitle('Metode Pengiriman'),
                       const SizedBox(height: 10),
-                      _DeliveryModeToggle(
+                      DeliveryModeToggle(
                         isPickup: _isPickup,
                         onChanged: _setPickup,
                       ),
@@ -418,12 +392,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           ),
                         ),
                       ] else ...[
-                        const _SectionTitle('Alamat Pengiriman'),
+                        const CheckoutSectionTitle('Alamat Pengiriman'),
                         const SizedBox(height: 10),
-                        _AddressSection(address: _selectedAddress, onChange: _pickAddress),
+                        CheckoutAddressSection(address: _selectedAddress, onChange: _pickAddress),
                         const SizedBox(height: 22),
                         if (_packageWeightGrams != null) ...[
-                          _PackageWeightNote(grams: _packageWeightGrams!, source: _packageWeightSource),
+                          PackageWeightNote(grams: _packageWeightGrams!, source: _packageWeightSource),
                           const SizedBox(height: 14),
                         ],
                         if (_checkingRates)
@@ -454,9 +428,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           ),
                         ],
                         if (_rates.isNotEmpty && !_checkingRates) ...[
-                          const _SectionTitle('Jenis Pengiriman'),
+                          const CheckoutSectionTitle('Jenis Pengiriman'),
                           const SizedBox(height: 10),
-                          _ShippingCategoryChips(
+                          ShippingCategoryChips(
                             categories: _groupRatesByCategory(_rates).keys.toList(),
                             selected: _selectedCategoryType,
                             labelOf: _categoryLabel,
@@ -467,7 +441,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           ),
                           if (_instantHint != null) ...[
                             const SizedBox(height: 10),
-                            _InfoNote(text: _instantHint!),
+                            CheckoutInfoNote(text: _instantHint!),
                           ],
                           const SizedBox(height: 16),
                           if (_selectedCategoryType == null)
@@ -476,9 +450,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
                             )
                           else ...[
-                            _SectionTitle('Kurir ${_categoryLabel(_selectedCategoryType!)}'),
+                            CheckoutSectionTitle('Kurir ${_categoryLabel(_selectedCategoryType!)}'),
                             const SizedBox(height: 10),
-                            _ShippingRateList(
+                            ShippingRateList(
                               rates: _groupRatesByCategory(_rates)[_selectedCategoryType] ?? const [],
                               selected: _selectedRate,
                               onSelect: (r) => setState(() => _selectedRate = r),
@@ -488,7 +462,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ],
                       ],
                       const SizedBox(height: 22),
-                      const _SectionTitle('Metode Pembayaran'),
+                      const CheckoutSectionTitle('Metode Pembayaran'),
                       const SizedBox(height: 10),
                       if (_paymentMethods.isEmpty)
                         const Text('Belum ada metode pembayaran aktif.', style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary))
@@ -565,252 +539,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
                     ],
                   ),
-      ),
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  final String title;
-  const _SectionTitle(this.title);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(title, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary));
-  }
-}
-
-/// "Kirim" (courier, live Biteship rates) vs "Ambil di Toko" (pick up, free,
-/// no address/rate step needed) — two equal-width segments.
-class _DeliveryModeToggle extends StatelessWidget {
-  final bool isPickup;
-  final ValueChanged<bool> onChanged;
-
-  const _DeliveryModeToggle({required this.isPickup, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Expanded(child: _segment(label: 'Kirim', icon: Icons.local_shipping_outlined, selected: !isPickup, onTap: () => onChanged(false))),
-          Expanded(child: _segment(label: 'Ambil di Toko', icon: Icons.storefront_rounded, selected: isPickup, onTap: () => onChanged(true))),
-        ],
-      ),
-    );
-  }
-
-  Widget _segment({required String label, required IconData icon, required bool selected, required VoidCallback onTap}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.purple : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 16, color: selected ? Colors.white : AppColors.textSecondary),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-                color: selected ? Colors.white : AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AddressSection extends StatelessWidget {
-  final UserAddress? address;
-  final VoidCallback onChange;
-
-  const _AddressSection({required this.address, required this.onChange});
-
-  @override
-  Widget build(BuildContext context) {
-    final a = address;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: a == null
-          ? Row(
-              children: [
-                const Expanded(
-                  child: Text('Belum ada alamat tersimpan', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                ),
-                TextButton(onPressed: onChange, child: const Text('Tambah')),
-              ],
-            )
-          : Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.location_on_rounded, size: 20, color: AppColors.purple),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${a.label} · ${a.recipientName ?? ''}',
-                        style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(a.summaryLine, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                    ],
-                  ),
-                ),
-                TextButton(onPressed: onChange, child: const Text('Ganti')),
-              ],
-            ),
-    );
-  }
-}
-
-/// Category selector shown above the courier list — "Instan / Reguler /
-/// Kargo / Internasional / Lainnya", only the categories that actually have
-/// a live rate for this route/weight.
-class _ShippingCategoryChips extends StatelessWidget {
-  final List<String> categories;
-  final String? selected;
-  final String Function(String) labelOf;
-  final ValueChanged<String> onSelect;
-
-  const _ShippingCategoryChips({
-    required this.categories,
-    required this.selected,
-    required this.labelOf,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (final key in categories)
-          ChoiceChip(
-            label: Text(labelOf(key)),
-            selected: key == selected,
-            onSelected: (_) => onSelect(key),
-            labelStyle: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              color: key == selected ? Colors.white : AppColors.textPrimary,
-            ),
-            selectedColor: AppColors.purple,
-            backgroundColor: AppColors.surface,
-            side: BorderSide(color: key == selected ? AppColors.purple : AppColors.border),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          ),
-      ],
-    );
-  }
-}
-
-class _ShippingRateList extends StatelessWidget {
-  final List<ShippingRateOption> rates;
-  final ShippingRateOption? selected;
-  final ValueChanged<ShippingRateOption> onSelect;
-  final String Function(int) rupiah;
-
-  const _ShippingRateList({required this.rates, required this.selected, required this.onSelect, required this.rupiah});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        children: [
-          for (final rate in rates)
-            RadioListTile<String>(
-              value: '${rate.courierCompany}_${rate.courierType}',
-              groupValue: selected != null ? '${selected!.courierCompany}_${selected!.courierType}' : null,
-              onChanged: (_) => onSelect(rate),
-              dense: true,
-              activeColor: AppColors.purple,
-              title: Text(rate.courierDisplayName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-              subtitle: rate.duration != null ? Text('Estimasi ${rate.duration}', style: const TextStyle(fontSize: 11.5)) : null,
-              secondary: Text(
-                rupiah(rate.price),
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-
-/// "Berat paket: 500 gram" — read-only; the merchant decides it.
-class _PackageWeightNote extends StatelessWidget {
-  final int grams;
-  final String? source;
-
-  const _PackageWeightNote({required this.grams, this.source});
-
-  @override
-  Widget build(BuildContext context) {
-    final weight = grams >= 1000 && grams % 100 == 0 ? '${(grams / 1000).toStringAsFixed(grams % 1000 == 0 ? 0 : 1)} kg' : '$grams gram';
-    final note = source == 'DEFAULT' ? 'perkiraan standar' : 'ditentukan penjual';
-    return Row(
-      children: [
-        const Icon(Icons.scale_rounded, size: 16, color: AppColors.textSecondary),
-        const SizedBox(width: 6),
-        Text('Berat paket: $weight', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-        Text(' · $note', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-      ],
-    );
-  }
-}
-
-class _InfoNote extends StatelessWidget {
-  final String text;
-
-  const _InfoNote({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.info_outline_rounded, size: 16, color: AppColors.purple),
-          const SizedBox(width: 8),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
-        ],
       ),
     );
   }

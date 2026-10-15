@@ -868,7 +868,9 @@ class _OrderCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          _formatDate(job.createdAt),
+                          job.weightLabel != null
+                              ? '${_formatDate(job.createdAt)} · ${job.weightLabel}'
+                              : _formatDate(job.createdAt),
                           style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                         ),
                       ],

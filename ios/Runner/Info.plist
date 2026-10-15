@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Lokasi dipakai untuk menyimpan titik alamat pengiriman agar kurir instan tersedia.</string>
+	<string>Lokasi wajib aktif untuk bertransaksi dan dipakai untuk menyimpan titik alamat pengiriman agar kurir instan tersedia.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

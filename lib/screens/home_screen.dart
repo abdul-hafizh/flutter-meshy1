@@ -5,6 +5,7 @@ import '../providers/auth_controller.dart';
 import '../services/auth_service.dart' show ApiException;
 import '../services/product_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/cart_icon_button.dart';
 import '../widgets/product_card.dart';
 import '../widgets/section_header.dart';
 import '../widgets/token_balance_badge.dart';
@@ -116,6 +117,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 10),
+                  const CartIconButton(),
                   const SizedBox(width: 10),
                   Container(
                     width: 42,

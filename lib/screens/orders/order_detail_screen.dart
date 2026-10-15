@@ -13,6 +13,7 @@ import '../../services/order_service.dart';
 import '../../services/shipment_tracking_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/gradient_button.dart';
+import '../../widgets/store_status.dart';
 import 'checkout_screen.dart';
 
 /// Renders inline inside the "Pesanan Fisik" tab (not pushed as its own
@@ -296,6 +297,10 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                             if (order.merchant != null) ...[
                               const SizedBox(height: 14),
                               _MerchantCard(merchant: order.merchant!),
+                            ],
+                            if (!order.isCompleted && !order.isCancelled && order.merchant?.operatingStatus?.isClosed == true) ...[
+                              const SizedBox(height: 12),
+                              ClosedStoreNotice(status: order.merchant!.operatingStatus),
                             ],
                             if (order.isPaid) ...[
                               const SizedBox(height: 14),

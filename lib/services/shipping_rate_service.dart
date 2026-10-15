@@ -63,6 +63,11 @@ class ShippingRateService {
       throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
     }
     final decoded = decodeApiResponse(res, fallbackMessage: 'Gagal mengecek ongkos kirim, coba lagi.');
+    return parseQuote(decoded);
+  }
+
+  /// Reads a shipping-rates response (orders and cart endpoints share its shape).
+  static ShippingQuote parseQuote(Map<String, dynamic> decoded) {
     final list = decoded['data'] as List<dynamic>? ?? [];
     final weight = decoded['packageWeight'] is Map<String, dynamic> ? decoded['packageWeight'] as Map<String, dynamic> : null;
     final instant =

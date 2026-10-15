@@ -1,4 +1,5 @@
 import 'ai_job.dart';
+import 'operating_status.dart';
 
 class OrderStatusInfo {
   final int id;
@@ -38,14 +39,16 @@ class OrderMerchantInfo {
   final String id;
   final String fullName;
   final String? avatar;
+  final OperatingStatus? operatingStatus;
 
-  const OrderMerchantInfo({required this.id, required this.fullName, this.avatar});
+  const OrderMerchantInfo({required this.id, required this.fullName, this.avatar, this.operatingStatus});
 
   factory OrderMerchantInfo.fromJson(Map<String, dynamic> json) {
     return OrderMerchantInfo(
       id: json['Id']?.toString() ?? '',
       fullName: json['FullName']?.toString() ?? 'Penjual',
       avatar: json['Avatar']?.toString(),
+      operatingStatus: OperatingStatus.tryParse(json['OperatingStatus']),
     );
   }
 }
