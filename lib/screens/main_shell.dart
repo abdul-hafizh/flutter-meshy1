@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_controller.dart';
+import '../providers/active_address_controller.dart';
 import '../providers/cart_controller.dart';
 import '../services/play_billing_service.dart';
 import '../theme/app_theme.dart';
@@ -31,6 +32,8 @@ class _MainShellState extends State<MainShell> {
     PlayBillingService.instance.start(context.read<AuthController>());
     // Cart badge on the home header.
     context.read<CartController>().refresh(context.read<AuthController>().token);
+    // Delivery address shown on the home screen (default = main address).
+    context.read<ActiveAddressController>().load(context.read<AuthController>().token);
   }
 
   void _goTo(int i) {

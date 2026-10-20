@@ -16,6 +16,7 @@ import '../../services/payment_method_service.dart';
 import '../../services/shipping_rate_service.dart';
 import '../../services/user_address_service.dart';
 import '../../services/location_gate.dart';
+import '../../providers/active_address_controller.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/store_status.dart';
 import '../../widgets/checkout/shipping_widgets.dart';
@@ -114,7 +115,12 @@ class _CartCheckoutScreenState extends State<CartCheckoutScreen> {
         _groups = results[0] as List<CartCheckoutGroup>;
         _paymentMethods = results[2] as List<PaymentMethodOption>;
         if (addresses.isNotEmpty) {
-          _address = addresses.firstWhere((a) => a.isDefault, orElse: () => addresses.first);
+          // The delivery address chosen on the home screen, else the main one.
+          final activeId = context.read<ActiveAddressController>().address?.id;
+          _address = addresses.firstWhere(
+            (a) => a.id == activeId,
+            orElse: () => addresses.firstWhere((a) => a.isDefault, orElse: () => addresses.first),
+          );
         }
       });
       try {
@@ -183,6 +189,7 @@ class _CartCheckoutScreenState extends State<CartCheckoutScreen> {
       MaterialPageRoute(builder: (_) => const AddressListScreen(selectMode: true)),
     );
     if (result == null || !mounted) return;
+    unawaited(context.read<ActiveAddressController>().select(result));
     setState(() => _address = result);
     // Every store shipping by courier needs a fresh quote to the new address.
     for (final g in _groups.where((g) => !_shipFor(g).isPickup)) {
@@ -460,7 +467,7 @@ class _StoreCheckoutCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      '${line.product?.productName ?? 'Produk'} × ${line.quantity}',
+                      '${line.displayName} × ${line.quantity}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),

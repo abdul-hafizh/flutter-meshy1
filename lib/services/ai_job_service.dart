@@ -52,6 +52,7 @@ class AiJobService {
 
   static Future<CreateJobResult> createTextTo3D({
     required String token,
+    required String merchantId,
     required String prompt,
     String artStyle = 'realistic',
     String? negativePrompt,
@@ -67,6 +68,7 @@ class AiJobService {
             _uri('/ai/jobs'),
             headers: _headers(token),
             body: jsonEncode({
+              'MerchantId': merchantId,
               'prompt': prompt,
               'artStyle': artStyle,
               if (negativePrompt != null && negativePrompt.trim().isNotEmpty)
@@ -97,6 +99,7 @@ class AiJobService {
   /// single, more complete model than a single photo can.
   static Future<CreateJobResult> createImageTo3D({
     required String token,
+    required String merchantId,
     required List<ImageUpload> images,
     String? prompt,
     String artStyle = 'realistic',
@@ -111,7 +114,8 @@ class AiJobService {
     try {
       final request = http.MultipartRequest('POST', _uri('/ai/jobs'))
         ..headers['Authorization'] = 'Bearer $token'
-        ..fields['artStyle'] = artStyle;
+        ..fields['artStyle'] = artStyle
+        ..fields['MerchantId'] = merchantId;
 
       for (final image in images) {
         // multer's fileFilter checks the multipart part's Content-Type, so

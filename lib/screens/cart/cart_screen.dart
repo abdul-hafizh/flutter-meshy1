@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../models/cart.dart';
 import '../../providers/auth_controller.dart';
 import '../../providers/cart_controller.dart';
-import '../../services/api_config.dart';
 import '../../services/auth_service.dart' show ApiException;
 import '../../services/cart_service.dart';
 import '../../services/location_gate.dart';
@@ -354,8 +353,8 @@ class _CartLineTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final product = line.product;
-    final thumb = product?.thumbnailPath;
+    final image = line.imageUrl;
+    final design = line.design;
     return Opacity(
       opacity: line.available ? 1 : 0.55,
       child: Padding(
@@ -373,9 +372,9 @@ class _CartLineTile extends StatelessWidget {
               child: SizedBox(
                 width: 64,
                 height: 64,
-                child: thumb != null && thumb.isNotEmpty
+                child: image != null && image.isNotEmpty
                     ? Image.network(
-                        ApiConfig.assetUrl(thumb),
+                        image,
                         fit: BoxFit.cover,
                         errorBuilder: (_, _, _) => const _ThumbFallback(),
                       )
@@ -388,14 +387,25 @@ class _CartLineTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    product?.productName ?? 'Produk tidak tersedia',
+                    line.displayName,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                   ),
                   const SizedBox(height: 4),
+                  if (design != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        if (design.materialName != null) 'Material ${design.materialName}',
+                        if (design.weightGrams != null) '± ${design.weightGrams!.round()} g',
+                      ].join(' · '),
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                  ],
+                  const SizedBox(height: 2),
                   Text(
-                    rupiahLabel(product?.price ?? 0),
+                    rupiahLabel(line.unitPrice),
                     style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.orangeDeep),
                   ),
                   if (line.issue != null) ...[
@@ -416,10 +426,10 @@ class _CartLineTile extends StatelessWidget {
                         tooltip: 'Hapus',
                       ),
                       const Spacer(),
-                      if (product != null)
+                      if (line.product != null || design != null)
                         _Stepper(
                           quantity: line.quantity,
-                          max: product.stock,
+                          max: line.maxQuantity,
                           busy: busy,
                           onChanged: onQuantity,
                         ),

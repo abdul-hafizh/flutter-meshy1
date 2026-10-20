@@ -232,6 +232,13 @@ class AiJobDetail {
   final AssignedMerchantInfo? assignedMerchant;
   final String? assignedOrderId;
 
+  /// Store chosen on the prompt screen (new flow) — the finished design is
+  /// added to the cart for this store instead of picking a merchant here.
+  final AssignedMerchantInfo? store;
+
+  /// The design's cart line, when it's already in the cart.
+  final String? cartItemId;
+
   const AiJobDetail({
     required this.id,
     this.prompt,
@@ -243,6 +250,8 @@ class AiJobDetail {
     required this.logs,
     this.assignedMerchant,
     this.assignedOrderId,
+    this.store,
+    this.cartItemId,
   });
 
   factory AiJobDetail.fromJson(Map<String, dynamic> json) {
@@ -263,8 +272,19 @@ class AiJobDetail {
           ? AssignedMerchantInfo.fromJson(json['AssignedMerchant'] as Map<String, dynamic>)
           : null,
       assignedOrderId: json['AssignedOrderId']?.toString(),
+      store: json['Store'] is Map<String, dynamic>
+          ? AssignedMerchantInfo.fromJson(json['Store'] as Map<String, dynamic>)
+          : null,
+      cartItemId: json['CartItemId']?.toString(),
     );
   }
+
+  /// New flow: a store was picked before generating, and no order was made
+  /// the old way (merchant picked after generating) — so the design goes
+  /// through the cart.
+  bool get usesCart => store != null && assignedMerchant == null;
+
+  bool get canAddToCart => usesCart && status == AiJobStatus.succeeded && primaryModel != null;
 
   AiModel? get primaryModel => models.isEmpty ? null : models.first;
 

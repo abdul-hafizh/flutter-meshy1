@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'providers/active_address_controller.dart';
 import 'providers/auth_controller.dart';
 import 'providers/cart_controller.dart';
 import 'providers/chat_controller.dart';
 import 'screens/auth/auth_gate.dart';
 import 'services/api_config.dart';
 import 'theme/app_theme.dart';
+import 'widgets/location_required_gate.dart';
 import 'widgets/update_gate.dart';
 
 void main() async {
@@ -27,13 +29,15 @@ class SnapyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthController()),
         ChangeNotifierProvider(create: (_) => ChatController()),
         ChangeNotifierProvider(create: (_) => CartController()),
+        ChangeNotifierProvider(create: (_) => ActiveAddressController()),
       ],
       child: MaterialApp(
         title: 'Petope',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
-        // Blocks the app until a pending Google Play update is installed.
-        home: const UpdateGate(child: AuthGate()),
+        // Blocks the app until a pending Google Play update is installed,
+        // then until location is on and allowed (required to use the app).
+        home: const UpdateGate(child: LocationRequiredGate(child: AuthGate())),
       ),
     );
   }

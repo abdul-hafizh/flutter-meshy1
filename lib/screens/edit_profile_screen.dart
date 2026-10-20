@@ -1,12 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/gradient_button.dart';
+import 'addresses/address_list_screen.dart';
 
-/// Lets the logged-in customer update their own name, phone and WhatsApp
-/// number. Email is fixed (it's the login identity) and shown read-only.
+const _monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+String _formatBirthDate(DateTime d) => '${d.day} ${_monthNames[d.month - 1]} ${d.year}';
+String _isoDate(DateTime d) =>
+    '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+/// The customer's own profile: photo, name, gender, date of birth, phone
+/// and WhatsApp. Email is fixed (it's the login identity) and shown
+/// read-only; shipping addresses (with their map pin) are managed in
+/// "Alamat Pengiriman".
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
 
@@ -19,8 +29,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _phoneCtrl;
   late final TextEditingController _whatsappCtrl;
+  String? _gender;
+  DateTime? _birthDate;
 
   bool _submitting = false;
+  bool _uploadingPhoto = false;
   String? _error;
 
   @override
@@ -30,6 +43,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameCtrl = TextEditingController(text: user?.fullName ?? '');
     _phoneCtrl = TextEditingController(text: user?.phone ?? '');
     _whatsappCtrl = TextEditingController(text: user?.whatsappNumber ?? '');
+    _gender = user?.gender;
+    _birthDate = user?.birthDate != null ? DateTime.tryParse(user!.birthDate!) : null;
   }
 
   @override
@@ -38,6 +53,53 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _phoneCtrl.dispose();
     _whatsappCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickPhoto() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Ambil foto'),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Pilih dari galeri'),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+    final file = await ImagePicker().pickImage(source: source, imageQuality: 85, maxWidth: 1024, maxHeight: 1024);
+    if (file == null || !mounted) return;
+    setState(() => _uploadingPhoto = true);
+    final bytes = await file.readAsBytes();
+    final name = file.name.contains('.') ? file.name : '${file.name}.jpg';
+    if (!mounted) return;
+    final error = await context.read<AuthController>().uploadAvatar(bytes, name);
+    if (!mounted) return;
+    setState(() => _uploadingPhoto = false);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error ?? 'Foto profil diperbarui.')));
+  }
+
+  Future<void> _pickBirthDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _birthDate ?? DateTime(now.year - 20, 1, 1),
+      firstDate: DateTime(now.year - 100),
+      lastDate: DateTime(now.year - 5, now.month, now.day),
+      helpText: 'Tanggal lahir',
+      initialEntryMode: DatePickerEntryMode.calendarOnly,
+    );
+    if (picked != null) setState(() => _birthDate = picked);
   }
 
   Future<void> _save() async {
@@ -51,6 +113,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           fullName: _nameCtrl.text.trim(),
           phone: _phoneCtrl.text.trim(),
           whatsappNumber: _whatsappCtrl.text.trim(),
+          gender: _gender ?? '',
+          birthDate: _birthDate != null ? _isoDate(_birthDate!) : '',
         );
 
     if (!mounted) return;
@@ -67,10 +131,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     Navigator.of(context).pop(true);
   }
 
-  InputDecoration _decoration(String label, {String? hint}) {
+  InputDecoration _decoration(String label, {String? hint, Widget? suffix}) {
     return InputDecoration(
       labelText: label,
       hintText: hint,
+      suffixIcon: suffix,
       filled: true,
       fillColor: AppColors.surfaceMuted,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
@@ -78,9 +143,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
+  Widget _label(String text) => Padding(
+        padding: const EdgeInsets.only(left: 4, bottom: 8),
+        child: Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+      );
+
   @override
   Widget build(BuildContext context) {
-    final email = context.watch<AuthController>().user?.email ?? '';
+    final user = context.watch<AuthController>().user;
+    final avatarUrl = user?.avatarUrl;
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -95,8 +166,127 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
             children: [
+              Center(
+                child: GestureDetector(
+                  onTap: _uploadingPhoto ? null : _pickPhoto,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 96,
+                        height: 96,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceMuted,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.border, width: 2),
+                        ),
+                        child: _uploadingPhoto
+                            ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                            : avatarUrl != null
+                                ? Image.network(
+                                    avatarUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) => const Icon(Icons.person_rounded, size: 46, color: AppColors.textFaint),
+                                  )
+                                : const Icon(Icons.person_rounded, size: 46, color: AppColors.textFaint),
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: -2,
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            gradient: AppColors.brandGradient,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.surface, width: 3),
+                          ),
+                          child: const Icon(Icons.photo_camera_rounded, size: 15, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Center(
+                child: Text('Ketuk untuk ganti foto profil', style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
+              ),
+              const SizedBox(height: 20),
               TextFormField(
-                initialValue: email,
+                controller: _nameCtrl,
+                textCapitalization: TextCapitalization.words,
+                decoration: _decoration('Nama lengkap'),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Nama lengkap wajib diisi' : null,
+              ),
+              const SizedBox(height: 16),
+              _label('Jenis kelamin'),
+              Row(
+                children: [
+                  for (final option in const [('MALE', 'Laki-laki', Icons.male_rounded), ('FEMALE', 'Perempuan', Icons.female_rounded)]) ...[
+                    Expanded(
+                      child: ChoiceChip(
+                        avatar: Icon(option.$3, size: 18, color: _gender == option.$1 ? AppColors.purple : AppColors.textSecondary),
+                        label: SizedBox(width: double.infinity, child: Text(option.$2, textAlign: TextAlign.center)),
+                        selected: _gender == option.$1,
+                        onSelected: (v) => setState(() => _gender = v ? option.$1 : null),
+                        selectedColor: AppColors.purple.withValues(alpha: 0.12),
+                        labelStyle: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: _gender == option.$1 ? AppColors.purple : AppColors.textSecondary,
+                        ),
+                        showCheckmark: false,
+                      ),
+                    ),
+                    if (option.$1 == 'MALE') const SizedBox(width: 10),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 16),
+              InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: _pickBirthDate,
+                child: InputDecorator(
+                  decoration: _decoration(
+                    'Tanggal lahir',
+                    suffix: _birthDate != null
+                        ? IconButton(
+                            tooltip: 'Hapus',
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                            onPressed: () => setState(() => _birthDate = null),
+                          )
+                        : const Icon(Icons.cake_outlined),
+                  ),
+                  child: Text(
+                    _birthDate != null ? _formatBirthDate(_birthDate!) : 'Pilih tanggal',
+                    style: TextStyle(fontSize: 15, color: _birthDate != null ? AppColors.textPrimary : AppColors.textFaint),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _phoneCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: _decoration('Nomor HP'),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _whatsappCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: _decoration('Nomor WhatsApp (opsional)'),
+              ),
+              const SizedBox(height: 4),
+              const Padding(
+                padding: EdgeInsets.only(left: 4),
+                child: Text(
+                  'Nomor HP & WhatsApp dipakai toko untuk menghubungimu soal pesanan.',
+                  style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                initialValue: user?.email ?? '',
                 enabled: false,
                 decoration: _decoration('Email'),
               ),
@@ -109,30 +299,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _nameCtrl,
-                textCapitalization: TextCapitalization.words,
-                decoration: _decoration('Nama lengkap'),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Nama lengkap wajib diisi' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _phoneCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: _decoration('Nomor telepon'),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _whatsappCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: _decoration('Nomor WhatsApp (opsional)'),
-              ),
-              const SizedBox(height: 4),
-              const Padding(
-                padding: EdgeInsets.only(left: 4),
-                child: Text(
-                  'Nomor telepon & WhatsApp dipakai merchant untuk menghubungimu soal pesanan.',
-                  style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+              Material(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(14),
+                child: ListTile(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: const BorderSide(color: AppColors.border),
+                  ),
+                  leading: const Icon(Icons.location_on_outlined, color: AppColors.purple),
+                  title: const Text('Alamat Pengiriman', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: const Text('Atur alamat & titik lokasi di peta'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AddressListScreen())),
                 ),
               ),
               if (_error != null) ...[

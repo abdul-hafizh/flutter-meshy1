@@ -6,6 +6,8 @@ import '../services/auth_service.dart' show ApiException;
 import '../services/product_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/cart_icon_button.dart';
+import '../widgets/home/delivery_address_bar.dart';
+import '../widgets/home/nearby_stores_section.dart';
 import '../widgets/product_card.dart';
 import '../widgets/section_header.dart';
 import '../widgets/token_balance_badge.dart';
@@ -137,8 +139,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 16),
+          const DeliveryAddressBar(),
+          const SizedBox(height: 18),
           _CreatePromptCard(onTap: widget.onCreateTap),
+          const SizedBox(height: 26),
+          const NearbyStoresSection(),
           const SizedBox(height: 26),
           SectionHeader(title: 'Produk Siap Checkout', actionLabel: 'Lihat Semua', onAction: widget.onSeeAllTap),
           const SizedBox(height: 12),

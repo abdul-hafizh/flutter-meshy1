@@ -709,7 +709,9 @@ class _ActionArea extends StatelessWidget {
   }
 
   Widget _buildPricedArea(BuildContext context) {
-    if (!order.isPaid) {
+    // A completed order is done — even an older one marked complete without
+    // a recorded payment never goes back to checkout (it can be rated).
+    if (!order.isPaid && !order.isCompleted) {
       final subtotalAmount = order.subtotalAmount;
       final discountAmount = order.discountAmount ?? 0;
       final taxAmount = order.taxAmount;

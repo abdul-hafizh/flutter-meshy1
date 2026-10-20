@@ -13,14 +13,13 @@ import '../services/cart_service.dart';
 import '../services/location_gate.dart';
 import '../services/chat_service.dart';
 import '../services/merchant_service.dart';
-import '../services/order_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/cart_icon_button.dart';
 import '../widgets/store_status.dart';
 import '../widgets/gradient_button.dart';
 import '../widgets/merchant_queue_badge.dart';
 import 'chat/chat_screen.dart';
-import 'orders/checkout_screen.dart';
+import 'cart/cart_checkout_screen.dart';
 
 /// Product photo, seller, price, description and a quantity stepper — "Beli
 /// Sekarang" creates an already-priced order via [OrderService.createFromProduct]
@@ -122,15 +121,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (!await LocationGate.ensureEnabled(context) || !mounted) return;
     setState(() => _buying = true);
     try {
-      final order = await OrderService.createFromProduct(
+      // Every purchase goes through the cart: put this product in with the
+      // chosen quantity, then check out just that line (shipping + payment).
+      final added = await CartService.add(
         token: token,
         productId: widget.product.id,
         quantity: _quantity,
+        replace: true,
       );
       if (!mounted) return;
+      final cart = context.read<CartController>();
+      cart.setCount(added.count);
+      final itemId = added.itemId;
+      if (itemId == null) return;
       await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => CheckoutScreen(order: order)),
+        MaterialPageRoute(builder: (_) => CartCheckoutScreen(cartItemIds: [itemId])),
       );
+      if (mounted) cart.refresh(token);
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));

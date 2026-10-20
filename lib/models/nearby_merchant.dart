@@ -24,6 +24,11 @@ class NearbyMerchant {
   final DateTime? estimatedAvailableAt;
   final OperatingStatus? operatingStatus;
 
+  /// Weight of everything the store sold in completed orders (products and
+  /// printed AI designs), and how many such orders.
+  final int soldGrams;
+  final int soldOrders;
+
   const NearbyMerchant({
     required this.id,
     required this.fullName,
@@ -41,6 +46,8 @@ class NearbyMerchant {
     this.queueWaitingCount = 0,
     this.estimatedAvailableAt,
     this.operatingStatus,
+    this.soldGrams = 0,
+    this.soldOrders = 0,
   });
 
   factory NearbyMerchant.fromJson(Map<String, dynamic> json) {
@@ -65,6 +72,8 @@ class NearbyMerchant {
       queueWaitingCount: int.tryParse('${json['QueueWaitingCount']}') ?? 0,
       estimatedAvailableAt: MerchantQueueStatus.parseTime(json['EstimatedAvailableAt']),
       operatingStatus: OperatingStatus.tryParse(json['OperatingStatus']),
+      soldGrams: int.tryParse('${json['SoldGrams'] ?? 0}') ?? (json['SoldGrams'] is num ? (json['SoldGrams'] as num).round() : 0),
+      soldOrders: int.tryParse('${json['SoldOrders'] ?? 0}') ?? 0,
     );
   }
 
@@ -82,6 +91,15 @@ class NearbyMerchant {
   String get distanceLabel => distanceKm != null ? '${distanceKm!.toStringAsFixed(1)} km' : '';
 
   bool get hasRating => rating != null && totalReviews > 0;
+
+  /// "1,2 kg terjual" / "350 g terjual".
+  String get soldLabel {
+    if (soldGrams >= 1000) {
+      final kg = (soldGrams / 1000).toStringAsFixed(soldGrams >= 10000 ? 0 : 1).replaceAll('.', ',');
+      return '$kg kg terjual';
+    }
+    return '$soldGrams g terjual';
+  }
 
   /// Print-queue busyness for the "pilih merchant" list (see MerchantQueueBadge).
   MerchantQueueStatus get queue => MerchantQueueStatus(

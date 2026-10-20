@@ -16,6 +16,7 @@ import '../../services/payment_method_service.dart';
 import '../../services/shipping_rate_service.dart';
 import '../../services/user_address_service.dart';
 import '../../services/location_gate.dart';
+import '../../providers/active_address_controller.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/store_status.dart';
 import '../../widgets/checkout/shipping_widgets.dart';
@@ -96,7 +97,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       setState(() {
         _paymentMethods = paymentMethods;
         if (addresses.isNotEmpty) {
-          _selectedAddress = addresses.firstWhere((a) => a.isDefault, orElse: () => addresses.first);
+          // The delivery address chosen on the home screen, else the main one.
+          final activeId = context.read<ActiveAddressController>().address?.id;
+          _selectedAddress = addresses.firstWhere(
+            (a) => a.id == activeId,
+            orElse: () => addresses.firstWhere((a) => a.isDefault, orElse: () => addresses.first),
+          );
         }
       });
 
@@ -127,6 +133,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       MaterialPageRoute(builder: (_) => const AddressListScreen(selectMode: true)),
     );
     if (result != null && mounted) {
+      unawaited(context.read<ActiveAddressController>().select(result));
       setState(() {
         _selectedAddress = result;
         _rates = [];

@@ -1,3 +1,5 @@
+import '../services/api_config.dart';
+
 /// Discount tier progress detail, as returned nested under `TierDetails` in
 /// `GET /auth/me` — mirrors the backend's `userTierHelper.calculateTier()`.
 class TierDetails {
@@ -47,6 +49,16 @@ class AppUser {
   final int discountPercent;
   final TierDetails? tierDetails;
 
+  /// Profile photo: an absolute URL (Google sign-in) or a backend path
+  /// (`/uploads/avatars/…`) — use [avatarUrl] to display it.
+  final String? avatar;
+
+  /// 'MALE' | 'FEMALE' | null
+  final String? gender;
+
+  /// Date of birth, YYYY-MM-DD.
+  final String? birthDate;
+
   const AppUser({
     required this.id,
     required this.fullName,
@@ -60,7 +72,18 @@ class AppUser {
     this.totalSpent = 0,
     this.discountPercent = 0,
     this.tierDetails,
+    this.avatar,
+    this.gender,
+    this.birthDate,
   });
+
+  String? get avatarUrl => avatar == null || avatar!.isEmpty ? null : ApiConfig.assetUrl(avatar!);
+
+  String? get genderLabel => switch (gender) {
+        'MALE' => 'Laki-laki',
+        'FEMALE' => 'Perempuan',
+        _ => null,
+      };
 
   factory AppUser.fromJson(Map<String, dynamic> json) {
     return AppUser(
@@ -84,6 +107,9 @@ class AppUser {
       tierDetails: json['TierDetails'] is Map<String, dynamic>
           ? TierDetails.fromJson(json['TierDetails'] as Map<String, dynamic>)
           : null,
+      avatar: (json['Avatar']?.toString().isNotEmpty ?? false) ? json['Avatar'].toString() : null,
+      gender: (json['Gender']?.toString().isNotEmpty ?? false) ? json['Gender'].toString() : null,
+      birthDate: (json['BirthDate']?.toString().isNotEmpty ?? false) ? json['BirthDate'].toString().substring(0, 10) : null,
     );
   }
 
@@ -99,5 +125,8 @@ class AppUser {
         'UserLevel': userLevel,
         'TotalSpent': totalSpent,
         'DiscountPercent': discountPercent,
+        'Avatar': avatar,
+        'Gender': gender,
+        'BirthDate': birthDate,
       };
 }

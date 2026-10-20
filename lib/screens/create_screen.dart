@@ -5,12 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../models/nearby_merchant.dart';
 import '../providers/auth_controller.dart';
 import '../services/ai_job_service.dart';
 import '../services/auth_service.dart' show ApiException;
 import '../theme/app_theme.dart';
 import '../widgets/category_tile.dart';
 import '../widgets/gradient_button.dart';
+import '../widgets/store_picker.dart';
 import '../widgets/token_balance_badge.dart';
 import '../config/features.dart';
 import 'buy_tokens_screen.dart';
@@ -46,6 +48,10 @@ class _CreateScreenState extends State<CreateScreen> {
   bool _hasText = false;
   bool _generating = false;
 
+  /// The store that will print the design — must be chosen before the
+  /// prompt; the finished design then goes into the cart for this store.
+  NearbyMerchant? _store;
+
   final List<XFile> _pickedImages = [];
   final List<Uint8List> _pickedImageBytesList = [];
 
@@ -75,7 +81,14 @@ class _CreateScreenState extends State<CreateScreen> {
   double? _parseDim(String text) => double.tryParse(text.trim().replaceAll(',', '.'));
 
   bool get _canGenerate =>
-      _mode == _CreateMode.text ? _hasText : _pickedImages.isNotEmpty;
+      _store != null && (_mode == _CreateMode.text ? _hasText : _pickedImages.isNotEmpty);
+
+  Future<void> _pickStore() async {
+    final store = await Navigator.of(context).push<NearbyMerchant>(
+      MaterialPageRoute(builder: (_) => StorePickerScreen(selectedId: _store?.id)),
+    );
+    if (store != null && mounted) setState(() => _store = store);
+  }
 
   Future<void> _pickImages() async {
     final remaining = _kMaxReferenceImages - _pickedImages.length;
@@ -99,6 +112,7 @@ class _CreateScreenState extends State<CreateScreen> {
 
   Future<void> _generate() async {
     if (!_canGenerate || _generating) return;
+    final store = _store!;
 
     final auth = context.read<AuthController>();
     final token = auth.token;
@@ -136,6 +150,7 @@ class _CreateScreenState extends State<CreateScreen> {
       if (_mode == _CreateMode.text) {
         await AiJobService.createTextTo3D(
           token: token,
+          merchantId: store.id,
           prompt: _controller.text.trim(),
           artStyle: _artStyle,
           negativePrompt: _negativeController.text,
@@ -147,6 +162,7 @@ class _CreateScreenState extends State<CreateScreen> {
       } else {
         await AiJobService.createImageTo3D(
           token: token,
+          merchantId: store.id,
           images: [
             for (var i = 0; i < _pickedImages.length; i++)
               ImageUpload(
@@ -176,7 +192,9 @@ class _CreateScreenState extends State<CreateScreen> {
         _pickedImageBytesList.clear();
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Desain 3D sedang diproses AI ✨ Cek progresnya di menu Pesanan.')),
+        SnackBar(
+          content: Text('Desain 3D sedang diproses AI ✨ Setelah jadi, masukkan ke keranjang ${store.fullName} dari menu Pesanan.'),
+        ),
       );
       unawaited(auth.refreshUser());
       widget.onCreated?.call();
@@ -227,10 +245,69 @@ class _CreateScreenState extends State<CreateScreen> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Deskripsikan produk impianmu, AI yang wujudkan',
+            'Pilih toko, deskripsikan produk impianmu, AI yang wujudkan',
             style: TextStyle(fontSize: 13.5, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 20),
+          const Text(
+            '1. Pilih Toko',
+            style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Toko ini yang akan mencetak desainmu. Hasil desain bisa langsung dimasukkan ke keranjang.',
+            style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 10),
+          if (_store == null)
+            OutlinedButton.icon(
+              onPressed: _pickStore,
+              icon: const Icon(Icons.storefront_rounded),
+              label: const Text('Pilih Toko', style: TextStyle(fontWeight: FontWeight.w700)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.purple,
+                side: const BorderSide(color: AppColors.purple, width: 1.4),
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                minimumSize: const Size(double.infinity, 0),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+            )
+          else
+            StoreSummaryTile(
+              store: _store!,
+              selected: true,
+              onTap: _pickStore,
+              trailing: const Text(
+                'Ganti',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.purple),
+              ),
+            ),
+          const SizedBox(height: 22),
+          Text(
+            '2. Buat Desain',
+            style: TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+              color: _store == null ? AppColors.textFaint : AppColors.textPrimary,
+            ),
+          ),
+          if (_store == null) ...[
+            const SizedBox(height: 4),
+            const Text(
+              'Pilih toko terlebih dahulu untuk mulai mengisi prompt.',
+              style: TextStyle(fontSize: 12.5, color: AppColors.orangeDeep, fontWeight: FontWeight.w600),
+            ),
+          ],
+          const SizedBox(height: 12),
+          // Locked until a store is chosen.
+          IgnorePointer(
+            ignoring: _store == null,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 200),
+              opacity: _store == null ? 0.4 : 1,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
           Row(
             children: [
               Expanded(
@@ -441,9 +518,15 @@ class _CreateScreenState extends State<CreateScreen> {
                 ),
             ],
           ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 32),
           GradientButton(
-            label: _generating ? 'Membuat desain...' : 'Buat dengan AI ✨',
+            label: _generating
+                ? 'Membuat desain...'
+                : (_store == null ? 'Pilih toko dulu' : 'Buat dengan AI ✨'),
             onPressed: _canGenerate && !_generating ? _generate : null,
           ),
         ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +12,7 @@ import '../../services/location_service.dart';
 import '../../services/region_matcher.dart';
 import '../../services/user_address_service.dart';
 import '../../theme/app_theme.dart';
+import 'map_picker_screen.dart';
 import '../../widgets/gradient_button.dart';
 
 class AddressFormScreen extends StatefulWidget {
@@ -182,6 +184,32 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     }
   }
 
+  /// Opens the map to place the pin precisely (starting from the saved pin,
+  /// else the device location), then fills the address from that point.
+  Future<void> _pickOnMap() async {
+    final initial = _latitude != null && _longitude != null ? LatLng(_latitude!, _longitude!) : null;
+    final picked = await Navigator.of(context).push<LatLng>(
+      MaterialPageRoute(builder: (_) => MapPickerScreen(initial: initial)),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _latitude = picked.latitude;
+      _longitude = picked.longitude;
+      _error = null;
+      _locating = true;
+    });
+    final filled = await _fillFromCoordinates(picked.latitude, picked.longitude);
+    if (!mounted) return;
+    setState(() => _locating = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(filled
+            ? 'Titik lokasi tersimpan dan alamat terisi otomatis. Periksa kembali sebelum menyimpan.'
+            : 'Titik lokasi tersimpan. Lengkapi alamat secara manual.'),
+      ),
+    );
+  }
+
   /// Reverse-geocodes the picked point and fills whatever the customer hasn't
   /// typed yet: the street address and postal code (only when empty) and the
   /// country/province/city pickers (matched by name against the backend's
@@ -267,6 +295,11 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    // Every shipping address needs its map pin (couriers and stores use it).
+    if (_latitude == null || _longitude == null) {
+      setState(() => _error = 'Tandai titik lokasi alamat di peta terlebih dahulu.');
+      return;
+    }
     final token = _token;
     if (token == null) return;
 
@@ -424,6 +457,38 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                 decoration: _decoration('Kode pos (opsional)'),
               ),
               const SizedBox(height: 12),
+              const Text(
+                'Titik lokasi di peta (wajib)',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 8),
+              if (_latitude != null && _longitude != null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.location_on_rounded, color: AppColors.success, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Titik tersimpan: ${_latitude!.toStringAsFixed(6)}, ${_longitude!.toStringAsFixed(6)}',
+                          style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              GradientButton(
+                label: _latitude != null ? 'Ubah Titik di Peta' : 'Pilih Titik di Peta',
+                icon: Icons.map_rounded,
+                onPressed: _locating ? null : _pickOnMap,
+              ),
+              const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: _locating ? null : _useCurrentLocation,
                 icon: _locating

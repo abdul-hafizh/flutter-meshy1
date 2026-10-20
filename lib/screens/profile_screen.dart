@@ -132,12 +132,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Container(
                       width: 84,
                       height: 84,
+                      clipBehavior: Clip.antiAlias,
                       decoration: BoxDecoration(
                         color: AppColors.surfaceMuted,
                         shape: BoxShape.circle,
                         border: Border.all(color: AppColors.border, width: 2),
                       ),
-                      child: const Icon(Icons.person_rounded, size: 42, color: AppColors.textFaint),
+                      child: user?.avatarUrl != null
+                          ? Image.network(
+                              user!.avatarUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => const Icon(Icons.person_rounded, size: 42, color: AppColors.textFaint),
+                            )
+                          : const Icon(Icons.person_rounded, size: 42, color: AppColors.textFaint),
                     ),
                     Positioned(
                       bottom: -2,

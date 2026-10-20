@@ -12,10 +12,13 @@ class CartAddResult {
   final String message;
   final int count;
 
-  const CartAddResult({required this.message, required this.count});
+  /// The cart line that was added/updated.
+  final String? itemId;
+
+  const CartAddResult({required this.message, required this.count, this.itemId});
 }
 
-/// The shopping cart for marketplace products (`/cart` on api-meshy). Items
+/// The shopping cart for marketplace products and AI designs (`/cart` on api-meshy). Items
 /// from several merchants check out together: one order per merchant, each
 /// with its own delivery (courier or pick up), all paid on one DOKU page.
 class CartService {
@@ -62,16 +65,56 @@ class CartService {
     return _asInt((decoded['data'] as Map<String, dynamic>?)?['count']);
   }
 
-  static Future<CartAddResult> add({required String token, required String productId, int quantity = 1}) async {
+  /// Adds a product to the cart. [replace] sets the line to exactly
+  /// [quantity] instead of adding to what's already there ("Beli Sekarang").
+  static Future<CartAddResult> add({
+    required String token,
+    required String productId,
+    int quantity = 1,
+    bool replace = false,
+  }) async {
     final decoded = await _send(
       'POST',
       '/cart/items',
       token: token,
-      body: {'ProductId': productId, 'Quantity': quantity},
+      body: {'ProductId': productId, 'Quantity': quantity, if (replace) 'Replace': true},
       fallbackMessage: 'Gagal menambahkan ke keranjang.',
     );
+    final data = decoded['data'] as Map<String, dynamic>?;
     return CartAddResult(
       message: decoded['message']?.toString() ?? 'Ditambahkan ke keranjang',
+      count: _asInt(data?['count']),
+      itemId: data?['Id']?.toString(),
+    );
+  }
+
+  /// Materials of the design's store with the design's price in each.
+  static Future<DesignCartOptions> designOptions({required String token, required String aiModelId}) async {
+    final decoded = await _send(
+      'GET',
+      '/cart/designs/options?AIModelId=${Uri.encodeQueryComponent(aiModelId)}',
+      token: token,
+      fallbackMessage: 'Gagal memuat pilihan material.',
+    );
+    return DesignCartOptions.fromJson(decoded['data'] as Map<String, dynamic>);
+  }
+
+  /// Puts a finished design in the cart (or updates its material/quantity).
+  static Future<CartAddResult> addDesign({
+    required String token,
+    required String aiModelId,
+    required int materialId,
+    int quantity = 1,
+  }) async {
+    final decoded = await _send(
+      'POST',
+      '/cart/designs',
+      token: token,
+      body: {'AIModelId': aiModelId, 'MaterialId': materialId, 'Quantity': quantity},
+      fallbackMessage: 'Gagal memasukkan desain ke keranjang.',
+    );
+    return CartAddResult(
+      message: decoded['message']?.toString() ?? 'Desain dimasukkan ke keranjang',
       count: _asInt((decoded['data'] as Map<String, dynamic>?)?['count']),
     );
   }

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../models/app_user.dart';
 import 'api_client.dart';
@@ -32,13 +33,17 @@ class AuthService {
     return _messageTranslations[raw.trim().toLowerCase()] ?? raw;
   }
 
+  /// Tells the backend this is the mobile app, which gets a long-lived,
+  /// auto-renewed login token instead of the dashboard's short one.
+  static const _clientHeaders = {'X-Client': 'petope-mobile'};
+
   static Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> body) async {
     http.Response res;
     try {
       res = await http
           .post(
             _uri(path),
-            headers: const {'Content-Type': 'application/json'},
+            headers: const {'Content-Type': 'application/json', ..._clientHeaders},
             body: jsonEncode(body),
           )
           .timeout(const Duration(seconds: 15));
@@ -63,6 +68,22 @@ class AuthService {
       token: data['token'] as String,
       user: AppUser.fromJson(data['user'] as Map<String, dynamic>),
     );
+  }
+
+  /// Swaps a still-valid token for a fresh one (`POST /auth/refresh`), so
+  /// the session keeps sliding forward while the app is used. A 401 here
+  /// means the token really is dead — decodeApiResponse then logs out.
+  static Future<String> refreshSession(String token) async {
+    http.Response res;
+    try {
+      res = await http
+          .post(_uri('/auth/refresh'), headers: {..._clientHeaders, 'Authorization': 'Bearer $token'})
+          .timeout(const Duration(seconds: 15));
+    } catch (_) {
+      throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
+    }
+    final decoded = decodeApiResponse(res);
+    return (decoded['data'] as Map<String, dynamic>)['token'] as String;
   }
 
   static Future<AuthResult> loginWithGoogle(String idToken) async {
@@ -98,6 +119,8 @@ class AuthService {
     String? fullName,
     String? phone,
     String? whatsappNumber,
+    String? gender,
+    String? birthDate,
   }) async {
     http.Response res;
     try {
@@ -109,6 +132,8 @@ class AuthService {
               if (fullName != null) 'FullName': fullName,
               if (phone != null) 'Phone': phone,
               if (whatsappNumber != null) 'WhatsappNumber': whatsappNumber,
+              'Gender': ?gender,
+              'BirthDate': ?birthDate,
             }),
           )
           .timeout(const Duration(seconds: 15));
@@ -128,6 +153,27 @@ class AuthService {
   /// balance) — the cached [AppUser] is only ever refreshed at login/
   /// register time otherwise, so callers should use this after anything
   /// that can change server-side state (a token purchase, a generation).
+  /// Uploads a new profile photo (`POST /auth/me/avatar`).
+  static Future<AppUser> uploadAvatar({required String token, required List<int> bytes, required String filename}) async {
+    http.Response res;
+    try {
+      final ext = filename.toLowerCase().split('.').last;
+      final request = http.MultipartRequest('POST', _uri('/auth/me/avatar'))
+        ..headers['Authorization'] = 'Bearer $token'
+        ..files.add(http.MultipartFile.fromBytes(
+          'avatar',
+          bytes,
+          filename: filename,
+          contentType: MediaType('image', ext == 'png' ? 'png' : ext == 'webp' ? 'webp' : 'jpeg'),
+        ));
+      res = await http.Response.fromStream(await request.send().timeout(const Duration(seconds: 60)));
+    } catch (_) {
+      throw ApiException('Gagal mengunggah foto. Periksa koneksi kamu.');
+    }
+    final decoded = decodeApiResponse(res, fallbackMessage: 'Gagal mengunggah foto profil.');
+    return AppUser.fromJson(decoded['data'] as Map<String, dynamic>);
+  }
+
   static Future<AppUser> fetchMe(String token) async {
     http.Response res;
     try {

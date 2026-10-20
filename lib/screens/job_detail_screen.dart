@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/ai_job.dart';
 import '../models/nearby_merchant.dart';
+import '../providers/active_address_controller.dart';
 import '../providers/auth_controller.dart';
 import '../providers/chat_controller.dart';
 import '../services/ai_job_service.dart';
@@ -16,9 +17,10 @@ import '../services/chat_service.dart';
 import '../services/merchant_service.dart';
 import '../services/order_link_service.dart';
 import '../services/order_service.dart';
-import '../services/user_address_service.dart';
 import '../services/location_gate.dart';
 import '../theme/app_theme.dart';
+import '../widgets/design_cart_sheet.dart';
+import '../widgets/gradient_button.dart';
 import '../widgets/store_status.dart';
 import '../widgets/merchant_queue_badge.dart';
 import 'chat/chat_screen.dart';
@@ -80,6 +82,13 @@ class _JobDetailViewState extends State<JobDetailView> {
 
   String? get _token => context.read<AuthController>().token;
 
+  Future<void> _openCartSheet() async {
+    final model = _detail?.primaryModel;
+    if (model == null) return;
+    final added = await showDesignCartSheet(context, aiModelId: model.id);
+    if (added && mounted) unawaited(_load());
+  }
+
   void _scheduleNextPoll() {
     _pollTimer?.cancel();
     final status = _detail?.status;
@@ -104,22 +113,11 @@ class _JobDetailViewState extends State<JobDetailView> {
     final token = _token;
     if (token == null) return;
     try {
-      // Bias the nearby list toward the customer's own saved-address city —
-      // the app has no GPS/maps package, so this is the best "where is the
-      // customer" signal available today.
-      int? cityId;
-      try {
-        final addresses = await UserAddressService.listMine(token: token);
-        if (addresses.isNotEmpty) {
-          final defaultAddress = addresses.firstWhere((a) => a.isDefault, orElse: () => addresses.first);
-          cityId = defaultAddress.cityId;
-        }
-      } catch (_) {
-        // No saved address yet — fall through with cityId == null, the
-        // backend still returns every merchant, just unranked by city.
-      }
-
-      final merchants = await MerchantService.listNearby(token: token, cityId: cityId);
+      // Closest to the delivery address chosen on the home screen.
+      final merchants = await MerchantService.listNearbyForMe(
+        token: token,
+        address: context.read<ActiveAddressController>().address,
+      );
       if (!mounted) return;
       setState(() => _merchants = merchants);
     } catch (_) {
@@ -369,6 +367,49 @@ class _JobDetailViewState extends State<JobDetailView> {
                             ],
                             const SizedBox(height: 20),
                             _ModelPreview(status: detail.status, model: detail.primaryModel),
+                            if (detail.usesCart) ...[
+                              const SizedBox(height: 18),
+                              const Text(
+                                'Toko Pembuat',
+                                style: TextStyle(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              _AssignedMerchantCard(
+                                merchant: detail.store!,
+                                loading: _openingChatMerchantId == detail.store!.id,
+                                onChat: _openingChatMerchantId == null ? () => _openChatWith(detail.store!.id) : null,
+                              ),
+                              const SizedBox(height: 14),
+                              if (detail.canAddToCart) ...[
+                                if (detail.cartItemId != null)
+                                  const Padding(
+                                    padding: EdgeInsets.only(bottom: 8),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.check_circle_rounded, size: 16, color: AppColors.success),
+                                        SizedBox(width: 6),
+                                        Text(
+                                          'Desain ini sudah ada di keranjang',
+                                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.success),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                GradientButton(
+                                  label: detail.cartItemId != null ? 'Ubah Material / Jumlah' : 'Masukkan ke Keranjang',
+                                  icon: Icons.add_shopping_cart_rounded,
+                                  onPressed: _openCartSheet,
+                                ),
+                              ] else if (!detail.status.isJobFinished)
+                                const Text(
+                                  'Setelah desain selesai dibuat, kamu bisa memilih material dan memasukkannya ke keranjang.',
+                                  style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                                ),
+                            ],
                             if (detail.primaryModel != null) ...[
                               const SizedBox(height: 18),
                               const Text(
@@ -396,7 +437,9 @@ class _JobDetailViewState extends State<JobDetailView> {
                                 ],
                               ),
                               const SizedBox(height: 22),
-                              if (detail.assignedMerchant != null) ...[
+                              if (detail.usesCart)
+                                const SizedBox.shrink()
+                              else if (detail.assignedMerchant != null) ...[
                                 const Text(
                                   'Merchant Kamu',
                                   style: TextStyle(

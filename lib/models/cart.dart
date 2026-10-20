@@ -1,3 +1,4 @@
+import '../services/api_config.dart';
 import 'operating_status.dart';
 
 int _asInt(dynamic v) => v is int ? v : (v is num ? v.round() : int.tryParse('$v') ?? 0);
@@ -27,25 +28,144 @@ class CartProduct {
       );
 }
 
-/// One line of the cart. [issue] is set when it can't be bought right now
-/// ("Stok habis", "Produk sedang tidak dijual", …) — such lines can't be selected.
+/// A generated AI design in the cart, printed by the store chosen on the
+/// prompt screen in the material the customer picked.
+class CartDesign {
+  final String aiModelId;
+  final String? aiJobId;
+  final String name;
+  final String? previewUrl;
+  final double? weightGrams;
+  final int? materialId;
+  final String? materialName;
+
+  const CartDesign({
+    required this.aiModelId,
+    this.aiJobId,
+    required this.name,
+    this.previewUrl,
+    this.weightGrams,
+    this.materialId,
+    this.materialName,
+  });
+
+  factory CartDesign.fromJson(Map<String, dynamic> json) {
+    final material = json['Material'] is Map<String, dynamic> ? json['Material'] as Map<String, dynamic> : null;
+    return CartDesign(
+      aiModelId: json['AIModelId']?.toString() ?? '',
+      aiJobId: json['AIJobId']?.toString(),
+      name: json['Name']?.toString() ?? 'Desain AI',
+      previewUrl: json['PreviewUrl']?.toString(),
+      weightGrams: json['WeightGrams'] is num ? (json['WeightGrams'] as num).toDouble() : null,
+      materialId: material == null ? null : _asInt(material['Id']),
+      materialName: material?['Name']?.toString(),
+    );
+  }
+}
+
+/// One line of the cart — a marketplace [product] or an AI [design]. [issue]
+/// is set when it can't be bought right now ("Stok habis", "Material tidak
+/// tersedia", …) — such lines can't be selected.
 class CartLine {
   final String id;
   final int quantity;
   final String? issue;
   final CartProduct? product;
+  final CartDesign? design;
 
-  const CartLine({required this.id, required this.quantity, this.issue, this.product});
+  /// Price of one unit, from the server (a design's price depends on its
+  /// weight and material).
+  final int unitPrice;
 
-  bool get available => issue == null && product != null;
-  int get lineTotal => (product?.price ?? 0) * quantity;
+  const CartLine({
+    required this.id,
+    required this.quantity,
+    this.issue,
+    this.product,
+    this.design,
+    this.unitPrice = 0,
+  });
 
-  factory CartLine.fromJson(Map<String, dynamic> json) => CartLine(
-        id: json['Id']?.toString() ?? '',
-        quantity: _asInt(json['Quantity']),
-        issue: json['Issue']?.toString(),
-        product: json['Product'] is Map<String, dynamic> ? CartProduct.fromJson(json['Product'] as Map<String, dynamic>) : null,
+  bool get isDesign => design != null;
+  bool get available => issue == null && (product != null || design != null);
+  int get lineTotal => unitPrice * quantity;
+
+  String get displayName => design?.name ?? product?.productName ?? 'Item tidak tersedia';
+
+  String? get imageUrl {
+    if (design != null) return design!.previewUrl;
+    final thumb = product?.thumbnailPath;
+    return thumb != null && thumb.isNotEmpty ? ApiConfig.assetUrl(thumb) : null;
+  }
+
+  /// Designs are printed to order — no stock limit.
+  int get maxQuantity => design != null ? 999 : (product?.stock ?? 0);
+
+  factory CartLine.fromJson(Map<String, dynamic> json) {
+    final product = json['Product'] is Map<String, dynamic> ? CartProduct.fromJson(json['Product'] as Map<String, dynamic>) : null;
+    return CartLine(
+      id: json['Id']?.toString() ?? '',
+      quantity: _asInt(json['Quantity']),
+      issue: json['Issue']?.toString(),
+      product: product,
+      design: json['Design'] is Map<String, dynamic> ? CartDesign.fromJson(json['Design'] as Map<String, dynamic>) : null,
+      unitPrice: json['UnitPrice'] != null ? _asInt(json['UnitPrice']) : (product?.price ?? 0),
+    );
+  }
+}
+
+/// A store material a design can be printed in, with that design's price.
+class DesignMaterialOption {
+  final int id;
+  final String name;
+  final int unitPrice;
+
+  const DesignMaterialOption({required this.id, required this.name, required this.unitPrice});
+
+  factory DesignMaterialOption.fromJson(Map<String, dynamic> json) => DesignMaterialOption(
+        id: _asInt(json['Id']),
+        name: json['Name']?.toString() ?? 'Material',
+        unitPrice: _asInt(json['UnitPrice']),
       );
+}
+
+/// `GET /cart/designs/options` — what's needed to put a design in the cart.
+class DesignCartOptions {
+  final String aiModelId;
+  final String name;
+  final double weightGrams;
+  final String storeName;
+  final List<DesignMaterialOption> materials;
+  final String? cartLineId;
+  final int? cartMaterialId;
+  final int? cartQuantity;
+
+  const DesignCartOptions({
+    required this.aiModelId,
+    required this.name,
+    required this.weightGrams,
+    required this.storeName,
+    required this.materials,
+    this.cartLineId,
+    this.cartMaterialId,
+    this.cartQuantity,
+  });
+
+  factory DesignCartOptions.fromJson(Map<String, dynamic> json) {
+    final line = json['CartLine'] is Map<String, dynamic> ? json['CartLine'] as Map<String, dynamic> : null;
+    return DesignCartOptions(
+      aiModelId: json['AIModelId']?.toString() ?? '',
+      name: json['Name']?.toString() ?? 'Desain AI',
+      weightGrams: json['WeightGrams'] is num ? (json['WeightGrams'] as num).toDouble() : 0,
+      storeName: json['StoreName']?.toString() ?? 'Toko',
+      materials: (json['Materials'] as List<dynamic>? ?? [])
+          .map((e) => DesignMaterialOption.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      cartLineId: line?['Id']?.toString(),
+      cartMaterialId: line == null ? null : _asInt(line['MaterialId']),
+      cartQuantity: line == null ? null : _asInt(line['Quantity']),
+    );
+  }
 }
 
 /// The cart lines of one merchant.

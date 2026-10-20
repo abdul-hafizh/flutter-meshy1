@@ -10,6 +10,7 @@ import '../../services/order_link_service.dart';
 import '../../services/order_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/chat/link_attachment_builders.dart';
+import '../../widgets/chat/print_file_sheet.dart';
 
 String _rupiah(int v) {
   final s = v.toString();
@@ -110,12 +111,23 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _sendPrintFile() async {
+    final merchantId = _counterpartId;
+    if (merchantId == null) return;
+    await showPrintFileSheet(context, merchantId: merchantId);
+  }
+
   @override
   Widget build(BuildContext context) {
     final appBar = StreamChannelHeader(
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          IconButton(
+            onPressed: _sendPrintFile,
+            tooltip: 'Kirim File Cetak',
+            icon: const Icon(Icons.view_in_ar_outlined),
+          ),
           IconButton(
             onPressed: _sendingOrderLink ? null : _shareOrder,
             tooltip: 'Kirim Pesanan',
@@ -147,6 +159,7 @@ class _ChatScreenState extends State<ChatScreen> {
         attachmentBuilders: const [
           ProductLinkAttachmentBuilder(),
           OrderLinkAttachmentBuilder(),
+          PrintFileAttachmentBuilder(),
         ],
       ),
       child: StreamChannel(
