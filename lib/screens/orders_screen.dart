@@ -97,6 +97,23 @@ class OrdersScreenState extends State<OrdersScreen> {
   /// Refetches the job list from the server. Called by [MainShell] whenever
   /// the Pesanan tab becomes visible, since IndexedStack keeps this screen
   /// alive instead of rebuilding it.
+  /// System back while an order / AI-job detail is open closes the detail
+  /// (back to the list) instead of leaving the tab. Returns true if handled.
+  bool handleBack() {
+    if (_mainTab == 'ai' && _selectedJobId != null) {
+      setState(() {
+        _selectedJobId = null;
+        _selectedPrompt = null;
+      });
+      return true;
+    }
+    if (_mainTab == 'physical' && _selectedOrderId != null) {
+      setState(() => _selectedOrderId = null);
+      return true;
+    }
+    return false;
+  }
+
   Future<void> reload() {
     if (_mainTab == 'physical') return _loadOrders();
     return _load();

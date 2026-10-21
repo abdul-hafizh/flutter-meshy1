@@ -105,7 +105,11 @@ class PlayBillingService {
 
   Future<void> _onPurchases(List<PurchaseDetails> purchases) async {
     for (final p in purchases) {
-      if (!p.productID.startsWith('token_')) continue;
+      // A canceled / failed purchase sheet comes back without a product id
+      // on Android — it must still reach the screen, or its button stays on
+      // "Memproses..." forever. Only completed purchases are token-filtered.
+      final isToken = p.productID.startsWith('token_');
+      if (!isToken && (p.status == PurchaseStatus.purchased || p.status == PurchaseStatus.restored)) continue;
       switch (p.status) {
         case PurchaseStatus.pending:
           _events.add(const PlayBillingPending());

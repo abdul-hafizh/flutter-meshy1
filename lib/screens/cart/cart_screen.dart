@@ -92,6 +92,42 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
+  Future<void> _editNotes(CartLine line) async {
+    final token = _token;
+    if (token == null) return;
+    final controller = TextEditingController(text: line.notes ?? '');
+    final notes = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Deskripsi untuk toko'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 500,
+          minLines: 3,
+          maxLines: 5,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(hintText: 'Contoh: warna merah, tinggi 10 cm, finishing halus'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+          TextButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('Simpan')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (notes == null || notes == (line.notes ?? '')) return;
+    setState(() => _busy.add(line.id));
+    try {
+      await CartService.updateNotes(token: token, itemId: line.id, notes: notes);
+      await _load();
+    } on ApiException catch (e) {
+      _snack(e.message);
+    } finally {
+      if (mounted) setState(() => _busy.remove(line.id));
+    }
+  }
+
   Future<void> _remove(CartLine line) async {
     final token = _token;
     if (token == null) return;
@@ -209,6 +245,7 @@ class _CartScreenState extends State<CartScreen> {
                               onToggleGroup: (v) => _toggleGroup(group, v),
                               onToggleLine: (line, v) => setState(() => v ? _selected.add(line.id) : _selected.remove(line.id)),
                               onQuantity: _changeQuantity,
+                              onNotes: _editNotes,
                               onRemove: _remove,
                             ),
                             const SizedBox(height: 12),
@@ -269,6 +306,7 @@ class _StoreCard extends StatelessWidget {
   final ValueChanged<bool> onToggleGroup;
   final void Function(CartLine line, bool value) onToggleLine;
   final void Function(CartLine line, int quantity) onQuantity;
+  final void Function(CartLine line) onNotes;
   final ValueChanged<CartLine> onRemove;
 
   const _StoreCard({
@@ -278,6 +316,7 @@ class _StoreCard extends StatelessWidget {
     required this.onToggleGroup,
     required this.onToggleLine,
     required this.onQuantity,
+    required this.onNotes,
     required this.onRemove,
   });
 
@@ -318,6 +357,39 @@ class _StoreCard extends StatelessWidget {
               ],
             ),
           ),
+          // Store rating and city.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(52, 0, 12, 10),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.star_rounded,
+                  size: 15,
+                  color: group.rating != null ? const Color(0xFFF5A623) : AppColors.textFaint,
+                ),
+                const SizedBox(width: 2),
+                Text(
+                  group.rating != null
+                      ? '${group.rating!.toStringAsFixed(1).replaceAll('.0', '')} (${group.totalReviews})'
+                      : 'Belum ada rating',
+                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+                if (group.cityName != null) ...[
+                  const SizedBox(width: 10),
+                  const Icon(Icons.place_outlined, size: 14, color: AppColors.textFaint),
+                  const SizedBox(width: 2),
+                  Flexible(
+                    child: Text(
+                      group.cityName!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
           const Divider(height: 1, color: AppColors.border),
           for (final line in group.items)
             _CartLineTile(
@@ -326,6 +398,7 @@ class _StoreCard extends StatelessWidget {
               busy: busy.contains(line.id),
               onToggle: (v) => onToggleLine(line, v),
               onQuantity: (q) => onQuantity(line, q),
+              onNotes: () => onNotes(line),
               onRemove: () => onRemove(line),
             ),
         ],
@@ -340,6 +413,7 @@ class _CartLineTile extends StatelessWidget {
   final bool busy;
   final ValueChanged<bool> onToggle;
   final ValueChanged<int> onQuantity;
+  final VoidCallback onNotes;
   final VoidCallback onRemove;
 
   const _CartLineTile({
@@ -348,6 +422,7 @@ class _CartLineTile extends StatelessWidget {
     required this.busy,
     required this.onToggle,
     required this.onQuantity,
+    required this.onNotes,
     required this.onRemove,
   });
 
@@ -401,6 +476,34 @@ class _CartLineTile extends StatelessWidget {
                         if (design.weightGrams != null) '± ${design.weightGrams!.round()} g',
                       ].join(' · '),
                       style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 4),
+                    InkWell(
+                      onTap: busy ? null : onNotes,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.edit_note_rounded, size: 16, color: AppColors.purple),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                line.notes ?? 'Tambah deskripsi untuk toko',
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontStyle: line.notes == null ? FontStyle.normal : FontStyle.italic,
+                                  fontWeight: line.notes == null ? FontWeight.w600 : FontWeight.w400,
+                                  color: line.notes == null ? AppColors.purple : AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                   const SizedBox(height: 2),

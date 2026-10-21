@@ -1,18 +1,22 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/nearby_merchant.dart';
 import '../../models/physical_order.dart';
 import '../../providers/auth_controller.dart';
 import '../../services/api_config.dart';
 import '../../services/auth_service.dart' show ApiException;
 import '../../services/invoice_service.dart';
+import '../../services/merchant_service.dart';
 import '../../services/order_service.dart';
 import '../../services/shipment_tracking_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/gradient_button.dart';
+import '../../widgets/store_picker.dart' show StoreSummaryTile;
 import '../../widgets/store_status.dart';
 import 'checkout_screen.dart';
 
@@ -296,7 +300,7 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                             _ModelPreview(item: order.primaryItem),
                             if (order.merchant != null) ...[
                               const SizedBox(height: 14),
-                              _MerchantCard(merchant: order.merchant!),
+                              _MerchantSummaryCard(merchant: order.merchant!),
                             ],
                             if (!order.isCompleted && !order.isCancelled && order.merchant?.operatingStatus?.isClosed == true) ...[
                               const SizedBox(height: 12),
@@ -359,14 +363,93 @@ class _OrderDetailViewState extends State<OrderDetailView> {
   }
 }
 
-class _ModelPreview extends StatelessWidget {
+class _ModelPreview extends StatefulWidget {
   final PhysicalOrderItem? item;
 
   const _ModelPreview({required this.item});
 
   @override
+  State<_ModelPreview> createState() => _ModelPreviewState();
+}
+
+class _ModelPreviewState extends State<_ModelPreview> {
+  /// null = still checking. Old Meshy files can be gone; then the preview
+  /// image (or an icon) is shown instead of an empty 3D viewer.
+  bool? _modelAvailable;
+  String? _checkedSrc;
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ModelPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.item?.aiModel?.glbViewerSrc != _checkedSrc) _check();
+  }
+
+  Future<void> _check() async {
+    final src = widget.item?.aiModel?.glbViewerSrc;
+    _checkedSrc = src;
+    if (src == null) return;
+    setState(() => _modelAvailable = null);
+    bool ok;
+    try {
+      // The first request copies the file to our server — allow time for it.
+      final res = await http.head(Uri.parse(src)).timeout(const Duration(seconds: 60));
+      ok = res.statusCode == 200;
+    } catch (_) {
+      ok = false;
+    }
+    if (mounted && _checkedSrc == src) setState(() => _modelAvailable = ok);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final item = widget.item;
     final viewerSrc = item?.aiModel?.glbViewerSrc;
+    if (viewerSrc != null && _modelAvailable == null) {
+      return Container(
+        height: 260,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(20)),
+        child: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(width: 26, height: 26, child: CircularProgressIndicator(strokeWidth: 2.4)),
+            SizedBox(height: 10),
+            Text('Memuat model 3D…', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          ],
+        ),
+      );
+    }
+    if (viewerSrc != null && _modelAvailable == false) {
+      final preview = item?.aiModel?.previewUrl;
+      return Column(
+        children: [
+          if (preview != null && preview.isNotEmpty)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.network(
+                preview,
+                height: 220,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const _ModelPreviewFallback(),
+              ),
+            )
+          else
+            const _ModelPreviewFallback(),
+          const SizedBox(height: 6),
+          const Text(
+            'File model 3D sudah tidak tersedia untuk ditampilkan.',
+            style: TextStyle(fontSize: 11.5, color: AppColors.textFaint),
+          ),
+        ],
+      );
+    }
     if (viewerSrc != null) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(20),
@@ -420,10 +503,48 @@ class _ModelPreviewFallback extends StatelessWidget {
   }
 }
 
+/// The order's store as the store list shows it: photo (icon when none),
+/// name, city, rating and total grams sold. Falls back to the name-only card
+/// while loading or if the store can't be loaded.
+class _MerchantSummaryCard extends StatefulWidget {
+  final OrderMerchantInfo merchant;
+
+  const _MerchantSummaryCard({required this.merchant});
+
+  @override
+  State<_MerchantSummaryCard> createState() => _MerchantSummaryCardState();
+}
+
+class _MerchantSummaryCardState extends State<_MerchantSummaryCard> {
+  Future<NearbyMerchant>? _summary;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final token = context.read<AuthController>().token;
+    if (_summary == null && token != null && widget.merchant.id.isNotEmpty) {
+      _summary = MerchantService.summary(token: token, merchantId: widget.merchant.id);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<NearbyMerchant>(
+      future: _summary,
+      builder: (context, snap) {
+        final store = snap.data;
+        if (store == null) return _MerchantCard(merchant: widget.merchant);
+        return StoreSummaryTile(store: store, trailing: const SizedBox.shrink());
+      },
+    );
+  }
+}
+
 class _MerchantCard extends StatelessWidget {
   final OrderMerchantInfo merchant;
 
   const _MerchantCard({required this.merchant});
+
 
   @override
   Widget build(BuildContext context) {

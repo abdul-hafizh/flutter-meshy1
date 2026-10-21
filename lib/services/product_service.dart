@@ -31,6 +31,7 @@ class ProductService {
     required String token,
     String? search,
     String? sellerName,
+    String? sellerId,
     int? categoryId,
     bool? isPublished,
     int page = 1,
@@ -39,6 +40,7 @@ class ProductService {
     final query = <String, String>{'page': '$page', 'limit': '$limit'};
     if (search != null && search.trim().isNotEmpty) query['search'] = search.trim();
     if (sellerName != null && sellerName.trim().isNotEmpty) query['sellerName'] = sellerName.trim();
+    if (sellerId != null && sellerId.isNotEmpty) query['sellerId'] = sellerId;
     if (categoryId != null) query['categoryId'] = '$categoryId';
     if (isPublished != null) query['isPublished'] = isPublished.toString();
 

@@ -22,7 +22,7 @@ class BuyTokensScreen extends StatefulWidget {
   State<BuyTokensScreen> createState() => _BuyTokensScreenState();
 }
 
-class _BuyTokensScreenState extends State<BuyTokensScreen> {
+class _BuyTokensScreenState extends State<BuyTokensScreen> with WidgetsBindingObserver {
   TokenPackage _selected = TokenPackage.all.first;
   bool _submitting = false;
   String? _error;
@@ -35,10 +35,12 @@ class _BuyTokensScreenState extends State<BuyTokensScreen> {
   List<ProductDetails> _playProducts = const [];
   String? _selectedProductId;
   StreamSubscription<PlayBillingEvent>? _playEvents;
+  Timer? _resumeCheck;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (_usePlay) {
       _playEvents = PlayBillingService.instance.events.listen(_onPlayEvent);
       _loadPlayProducts();
@@ -47,8 +49,23 @@ class _BuyTokensScreenState extends State<BuyTokensScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _resumeCheck?.cancel();
     _playEvents?.cancel();
     super.dispose();
+  }
+
+  // Back from Google Play's purchase sheet: its outcome normally arrives as
+  // an event right away. If none came (sheet dismissed without a result),
+  // free the button instead of leaving it on "Memproses...". A purchase
+  // still being verified reports through the events (snackbar) anyway.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !_usePlay || !_submitting) return;
+    _resumeCheck?.cancel();
+    _resumeCheck = Timer(const Duration(seconds: 3), () {
+      if (mounted && _submitting) setState(() => _submitting = false);
+    });
   }
 
   Future<void> _loadPlayProducts() async {

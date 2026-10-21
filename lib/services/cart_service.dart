@@ -105,12 +105,13 @@ class CartService {
     required String aiModelId,
     required int materialId,
     int quantity = 1,
+    String? notes,
   }) async {
     final decoded = await _send(
       'POST',
       '/cart/designs',
       token: token,
-      body: {'AIModelId': aiModelId, 'MaterialId': materialId, 'Quantity': quantity},
+      body: {'AIModelId': aiModelId, 'MaterialId': materialId, 'Quantity': quantity, 'Notes': ?notes},
       fallbackMessage: 'Gagal memasukkan desain ke keranjang.',
     );
     return CartAddResult(
@@ -121,6 +122,11 @@ class CartService {
 
   static Future<void> updateQuantity({required String token, required String itemId, required int quantity}) async {
     await _send('PUT', '/cart/items/$itemId', token: token, body: {'Quantity': quantity});
+  }
+
+  /// A design line's description for the store (blank clears it).
+  static Future<void> updateNotes({required String token, required String itemId, required String notes}) async {
+    await _send('PUT', '/cart/items/$itemId', token: token, body: {'Notes': notes});
   }
 
   static Future<void> remove({required String token, required String itemId}) async {

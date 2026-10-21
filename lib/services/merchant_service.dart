@@ -97,6 +97,20 @@ class MerchantService {
     return listNearby(token: token, cityId: a?.cityId, latitude: a?.latitude, longitude: a?.longitude);
   }
 
+  /// One store as the store list shows it (photo, city, rating, grams sold).
+  static Future<NearbyMerchant> summary({required String token, required String merchantId}) async {
+    http.Response res;
+    try {
+      res = await http
+          .get(_uri('/merchants/$merchantId/summary'), headers: _headers(token))
+          .timeout(const Duration(seconds: 15));
+    } catch (_) {
+      throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
+    }
+    final decoded = decodeApiResponse(res);
+    return NearbyMerchant.fromJson(decoded['data'] as Map<String, dynamic>? ?? const {});
+  }
+
   /// How busy one merchant's print queue is — shown before ordering from
   /// them (e.g. on a product page). Counts only, never who is queued.
   static Future<MerchantQueueStatus> queueStatus({required String token, required String merchantId}) async {

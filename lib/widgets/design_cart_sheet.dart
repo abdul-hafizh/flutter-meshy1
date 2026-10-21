@@ -39,11 +39,18 @@ class _DesignCartSheetState extends State<_DesignCartSheet> {
   int? _materialId;
   int _quantity = 1;
   bool _saving = false;
+  final TextEditingController _notes = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _notes.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -59,6 +66,7 @@ class _DesignCartSheetState extends State<_DesignCartSheet> {
             ? inCart
             : (options.materials.isNotEmpty ? options.materials.first.id : null);
         _quantity = options.cartQuantity ?? 1;
+        _notes.text = options.cartNotes ?? '';
       });
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -87,6 +95,7 @@ class _DesignCartSheetState extends State<_DesignCartSheet> {
         aiModelId: widget.aiModelId,
         materialId: material.id,
         quantity: _quantity,
+        notes: _notes.text.trim(),
       );
       if (!mounted) return;
       context.read<CartController>().setCount(result.count);
@@ -180,6 +189,26 @@ class _DesignCartSheetState extends State<_DesignCartSheet> {
                             color: AppColors.purple,
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _notes,
+                        maxLength: 500,
+                        minLines: 2,
+                        maxLines: 4,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: InputDecoration(
+                          labelText: 'Deskripsi untuk toko (opsional)',
+                          hintText: 'Contoh: warna merah, tinggi 10 cm, finishing halus',
+                          alignLabelWithHint: true,
+                          filled: true,
+                          fillColor: AppColors.surface,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(color: AppColors.border),
+                          ),
+                        ),
                       ),
                       const Divider(color: AppColors.border),
                       Row(

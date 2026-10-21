@@ -16,10 +16,17 @@ class MarketScreen extends StatefulWidget {
   const MarketScreen({super.key});
 
   @override
-  State<MarketScreen> createState() => _MarketScreenState();
+  State<MarketScreen> createState() => MarketScreenState();
 }
 
-class _MarketScreenState extends State<MarketScreen> {
+class MarketScreenState extends State<MarketScreen> {
+  /// Called when the Market tab is opened — products published (or priced)
+  /// since the app started show up without restarting it.
+  Future<void> reload() async {
+    if (_products == null) _loadCategories();
+    await _loadProducts();
+  }
+
   static const _pageSize = 10;
 
   final _searchController = TextEditingController();
@@ -294,7 +301,7 @@ class _MarketScreenState extends State<MarketScreen> {
                   crossAxisCount: 2,
                   mainAxisSpacing: 14,
                   crossAxisSpacing: 14,
-                  childAspectRatio: 0.68,
+                  childAspectRatio: 0.63,
                 ),
                 itemBuilder: (context, i) {
                   final product = _products![i];

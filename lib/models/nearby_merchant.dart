@@ -1,4 +1,5 @@
 import 'merchant_queue_status.dart';
+import '../utils/sold_format.dart';
 import 'operating_status.dart';
 
 /// One row from `GET /merchants/nearby` — a merchant candidate the customer
@@ -60,7 +61,8 @@ class NearbyMerchant {
       fullName: json['FullName']?.toString() ?? 'Merchant',
       avatar: json['Avatar']?.toString(),
       address: company is Map<String, dynamic> ? company['Address']?.toString() : null,
-      cityName: city is Map<String, dynamic> ? city['Name']?.toString() : null,
+      // CityName: the company's city, else the merchant's own address city.
+      cityName: json['CityName']?.toString() ?? (city is Map<String, dynamic> ? city['Name']?.toString() : null),
       provinceName: province is Map<String, dynamic> ? province['Name']?.toString() : null,
       countryName: country is Map<String, dynamic> ? country['Name']?.toString() : null,
       distanceKm: json['DistanceKm'] is num ? (json['DistanceKm'] as num).toDouble() : null,
@@ -93,13 +95,8 @@ class NearbyMerchant {
   bool get hasRating => rating != null && totalReviews > 0;
 
   /// "1,2 kg terjual" / "350 g terjual".
-  String get soldLabel {
-    if (soldGrams >= 1000) {
-      final kg = (soldGrams / 1000).toStringAsFixed(soldGrams >= 10000 ? 0 : 1).replaceAll('.', ',');
-      return '$kg kg terjual';
-    }
-    return '$soldGrams g terjual';
-  }
+  /// "350 g terjual", "2.3k g terjual", "1.2Jt g terjual".
+  String get soldLabel => '${shortGrams(soldGrams)} terjual';
 
   /// Print-queue busyness for the "pilih merchant" list (see MerchantQueueBadge).
   MerchantQueueStatus get queue => MerchantQueueStatus(

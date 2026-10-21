@@ -106,6 +106,34 @@ class _StoreClosedBadge extends StatelessWidget {
 }
 
 /// Horizontal row-style card used in the Beranda "Produk Siap Checkout" list.
+/// "★ 4.8 (12) · 350 g terjual" — rating and total sold of a product.
+class ProductSalesStats extends StatelessWidget {
+  final Product product;
+  final double fontSize;
+
+  const ProductSalesStats({super.key, required this.product, this.fontSize = 11.5});
+
+  @override
+  Widget build(BuildContext context) {
+    final sold = product.soldLabel;
+    final style = TextStyle(fontSize: fontSize, color: AppColors.textSecondary);
+    return Row(
+      children: [
+        Icon(Icons.star_rounded, size: fontSize + 3, color: product.hasRating ? const Color(0xFFF5A623) : AppColors.textFaint),
+        const SizedBox(width: 2),
+        Flexible(
+          child: Text(
+            [product.ratingLabel, ?sold].join(' · '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: style,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class TrendingProductTile extends StatelessWidget {
   final Product product;
   final VoidCallback? onTap;
@@ -164,6 +192,8 @@ class TrendingProductTile extends StatelessWidget {
                         ],
                       ],
                     ),
+                    const SizedBox(height: 3),
+                    ProductSalesStats(product: product, fontSize: 11.5),
                   ],
                 ),
               ),
@@ -244,7 +274,9 @@ class MarketProductCard extends StatelessWidget {
                     color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 3),
+                ProductSalesStats(product: product, fontSize: 11),
+                const SizedBox(height: 5),
                 Text(
                   product.priceLabel,
                   style: const TextStyle(

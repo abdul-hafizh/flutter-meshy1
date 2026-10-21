@@ -22,6 +22,8 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _index = 0;
+  final _homeKey = GlobalKey<HomeScreenState>();
+  final _marketKey = GlobalKey<MarketScreenState>();
   final _ordersKey = GlobalKey<OrdersScreenState>();
 
   @override
@@ -37,24 +39,39 @@ class _MainShellState extends State<MainShell> {
   }
 
   void _goTo(int i) {
+    final changed = i != _index;
     setState(() => _index = i);
+    // Fresh data each time a list tab is opened.
+    if (i == 0 && changed) _homeKey.currentState?.reload();
+    if (i == 2) _marketKey.currentState?.reload();
     if (i == 3) _ordersKey.currentState?.reload();
   }
 
   @override
   Widget build(BuildContext context) {
     final screens = [
-      HomeScreen(onCreateTap: () => _goTo(1), onSeeAllTap: () => _goTo(2)),
+      HomeScreen(key: _homeKey, onCreateTap: () => _goTo(1), onSeeAllTap: () => _goTo(2)),
       CreateScreen(onCreated: () => _goTo(3)),
-      const MarketScreen(),
+      MarketScreen(key: _marketKey),
       OrdersScreen(key: _ordersKey),
       const ProfileScreen(),
     ];
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: IndexedStack(index: _index, children: screens),
-      bottomNavigationBar: AppBottomNav(currentIndex: _index, onTap: _goTo),
+    // System back: close an open order detail first, then return to the
+    // home tab; only back on the home tab leaves the app.
+    final canExit = _index == 0;
+    return PopScope(
+      canPop: canExit,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (_index == 3 && (_ordersKey.currentState?.handleBack() ?? false)) return;
+        _goTo(0);
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: IndexedStack(index: _index, children: screens),
+        bottomNavigationBar: AppBottomNav(currentIndex: _index, onTap: _goTo),
+      ),
     );
   }
 }

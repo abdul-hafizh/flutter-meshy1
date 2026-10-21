@@ -23,10 +23,13 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.onCreateTap, required this.onSeeAllTap});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<HomeScreen> createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> {
+  /// Called when the Home tab is opened again — refreshes "Produk Siap Checkout".
+  Future<void> reload() => _loadProducts();
+
   List<Product>? _readyProducts;
   bool _loadingProducts = true;
   String? _loadError;

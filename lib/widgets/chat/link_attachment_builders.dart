@@ -185,9 +185,9 @@ class _OrderLinkCard extends StatelessWidget {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => Scaffold(
-          appBar: AppBar(title: const Text('Detail Pesanan')),
+          backgroundColor: AppColors.background,
+          // OrderDetailView brings its own header with a back button.
           body: SafeArea(
-            top: false,
             child: OrderDetailView(orderId: orderId, onBack: () => Navigator.of(context).pop()),
           ),
         ),

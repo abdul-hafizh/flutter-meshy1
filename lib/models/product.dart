@@ -1,3 +1,4 @@
+import '../utils/sold_format.dart';
 import 'operating_status.dart';
 
 /// A ready-made product a merchant sells directly (already priced, with
@@ -19,6 +20,14 @@ class Product {
   final OperatingStatus? sellerStatus;
   final bool isPublished;
 
+  /// Average of the ratings on orders containing this product (null = none yet).
+  final double? avgRating;
+  final int ratingCount;
+
+  /// Sold in completed orders: total grams and units.
+  final int soldGrams;
+  final int soldUnits;
+
   const Product({
     required this.id,
     required this.productName,
@@ -32,6 +41,10 @@ class Product {
     this.sellerAvatar,
     this.sellerStatus,
     this.isPublished = false,
+    this.avgRating,
+    this.ratingCount = 0,
+    this.soldGrams = 0,
+    this.soldUnits = 0,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -50,10 +63,25 @@ class Product {
       sellerAvatar: seller is Map<String, dynamic> ? seller['Avatar']?.toString() : null,
       sellerStatus: seller is Map<String, dynamic> ? OperatingStatus.tryParse(seller['OperatingStatus']) : null,
       isPublished: json['IsPublished'] == true || json['IsPublished'] == 1,
+      avgRating: json['AvgRating'] is num ? (json['AvgRating'] as num).toDouble() : double.tryParse('${json['AvgRating']}'),
+      ratingCount: int.tryParse('${json['RatingCount'] ?? 0}') ?? 0,
+      soldGrams: (json['SoldGrams'] is num ? (json['SoldGrams'] as num).round() : int.tryParse('${json['SoldGrams']}')) ?? 0,
+      soldUnits: (json['SoldUnits'] is num ? (json['SoldUnits'] as num).round() : int.tryParse('${json['SoldUnits']}')) ?? 0,
     );
   }
 
   bool get inStock => stock > 0;
+
+  bool get hasRating => avgRating != null && ratingCount > 0;
+
+  String get ratingLabel => hasRating ? '${avgRating!.toStringAsFixed(1).replaceAll('.0', '')} ($ratingCount)' : 'Belum ada rating';
+
+  /// "350 g terjual" / "2.3k g terjual" / "1.2Jt g terjual"; units when no
+  /// weight is known; null = not sold yet.
+  String? get soldLabel {
+    if (soldGrams > 0) return '${shortGrams(soldGrams)} terjual';
+    return soldUnits > 0 ? '$soldUnits terjual' : null;
+  }
 
   String get priceLabel {
     final s = price.toString();

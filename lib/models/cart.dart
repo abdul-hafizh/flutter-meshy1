@@ -73,6 +73,9 @@ class CartLine {
   final CartProduct? product;
   final CartDesign? design;
 
+  /// AI designs: the customer's optional description for the store.
+  final String? notes;
+
   /// Price of one unit, from the server (a design's price depends on its
   /// weight and material).
   final int unitPrice;
@@ -83,6 +86,7 @@ class CartLine {
     this.issue,
     this.product,
     this.design,
+    this.notes,
     this.unitPrice = 0,
   });
 
@@ -109,6 +113,7 @@ class CartLine {
       issue: json['Issue']?.toString(),
       product: product,
       design: json['Design'] is Map<String, dynamic> ? CartDesign.fromJson(json['Design'] as Map<String, dynamic>) : null,
+      notes: (json['Notes']?.toString().trim().isNotEmpty ?? false) ? json['Notes'].toString() : null,
       unitPrice: json['UnitPrice'] != null ? _asInt(json['UnitPrice']) : (product?.price ?? 0),
     );
   }
@@ -139,6 +144,7 @@ class DesignCartOptions {
   final String? cartLineId;
   final int? cartMaterialId;
   final int? cartQuantity;
+  final String? cartNotes;
 
   const DesignCartOptions({
     required this.aiModelId,
@@ -149,6 +155,7 @@ class DesignCartOptions {
     this.cartLineId,
     this.cartMaterialId,
     this.cartQuantity,
+    this.cartNotes,
   });
 
   factory DesignCartOptions.fromJson(Map<String, dynamic> json) {
@@ -164,6 +171,7 @@ class DesignCartOptions {
       cartLineId: line?['Id']?.toString(),
       cartMaterialId: line == null ? null : _asInt(line['MaterialId']),
       cartQuantity: line == null ? null : _asInt(line['Quantity']),
+      cartNotes: line?['Notes']?.toString(),
     );
   }
 }
@@ -175,7 +183,20 @@ class CartGroup {
   final List<CartLine> items;
   final OperatingStatus? operatingStatus;
 
-  const CartGroup({required this.merchantId, required this.storeName, required this.items, this.operatingStatus});
+  /// The store's average rating (null = no reviews yet) and its city.
+  final double? rating;
+  final int totalReviews;
+  final String? cityName;
+
+  const CartGroup({
+    required this.merchantId,
+    required this.storeName,
+    required this.items,
+    this.operatingStatus,
+    this.rating,
+    this.totalReviews = 0,
+    this.cityName,
+  });
 
   factory CartGroup.fromJson(Map<String, dynamic> json) => CartGroup(
         merchantId: json['MerchantId']?.toString(),
@@ -184,6 +205,9 @@ class CartGroup {
             .map((e) => CartLine.fromJson(e as Map<String, dynamic>))
             .toList(),
         operatingStatus: OperatingStatus.tryParse(json['OperatingStatus']),
+        rating: json['Rating'] is num ? (json['Rating'] as num).toDouble() : double.tryParse('${json['Rating']}'),
+        totalReviews: _asInt(json['TotalReviews']),
+        cityName: (json['CityName']?.toString().trim().isNotEmpty ?? false) ? json['CityName'].toString() : null,
       );
 }
 
