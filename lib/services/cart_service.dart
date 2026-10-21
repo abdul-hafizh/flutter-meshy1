@@ -193,6 +193,7 @@ class CartService {
       redirectUrl: payment?['redirectUrl']?.toString(),
       amount: payment == null ? null : _asInt(payment['amount']),
       paymentError: data['PaymentError']?.toString(),
+      awaitingConfirmation: _asInt(data['AwaitingConfirmation']),
     );
   }
 }

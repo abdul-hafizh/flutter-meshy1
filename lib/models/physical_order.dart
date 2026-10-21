@@ -238,6 +238,10 @@ class PhysicalOrder {
   final int? taxAmount;
   final int? appFeeAmount;
   final String? notes;
+
+  /// AI-design order waiting for the store to confirm the print weight
+  /// (and so the price) — it can't be paid yet.
+  final bool awaitingMerchantConfirmation;
   final int? rating;
   final String? ratingNotes;
   final DateTime? createdAt;
@@ -258,6 +262,7 @@ class PhysicalOrder {
     this.taxAmount,
     this.appFeeAmount,
     this.notes,
+    this.awaitingMerchantConfirmation = false,
     this.rating,
     this.ratingNotes,
     this.createdAt,
@@ -280,6 +285,7 @@ class PhysicalOrder {
       taxAmount: json['TaxAmount'] is int ? json['TaxAmount'] as int : int.tryParse('${json['TaxAmount']}'),
       appFeeAmount: json['AppFeeAmount'] is int ? json['AppFeeAmount'] as int : int.tryParse('${json['AppFeeAmount']}'),
       notes: json['Notes']?.toString(),
+      awaitingMerchantConfirmation: json['AwaitingMerchantConfirmation'] == true || json['AwaitingMerchantConfirmation'] == 1,
       rating: json['Rating'] is int ? json['Rating'] as int : int.tryParse('${json['Rating']}'),
       ratingNotes: json['RatingNotes']?.toString(),
       createdAt: DateTime.tryParse(json['CreatedAt']?.toString() ?? ''),

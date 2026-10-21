@@ -664,11 +664,17 @@ class _PhysicalOrderCard extends StatelessWidget {
                     Text(_formatDate(order.createdAt), style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                     const SizedBox(height: 4),
                     Text(
-                      order.isPriced ? _rupiah(order.totalAmount!) : 'Menunggu konfirmasi harga',
+                      order.awaitingMerchantConfirmation && !order.isPaid
+                          ? 'Menunggu konfirmasi toko'
+                          : order.isPriced
+                              ? _rupiah(order.totalAmount!)
+                              : 'Menunggu konfirmasi harga',
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
-                        color: order.isPriced ? AppColors.textPrimary : AppColors.orange,
+                        color: order.isPriced && !(order.awaitingMerchantConfirmation && !order.isPaid)
+                            ? AppColors.textPrimary
+                            : AppColors.orange,
                       ),
                     ),
                   ],

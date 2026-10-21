@@ -227,7 +227,7 @@ class _OrderPickerSheetState extends State<_OrderPickerSheet> {
       final orders = await OrderService.listMine(token: token);
       if (!mounted) return;
       setState(() => _orders = orders
-          .where((o) => o.isPriced && o.merchant?.id.toLowerCase() == merchantId)
+          .where((o) => o.isPriced && !o.awaitingMerchantConfirmation && o.merchant?.id.toLowerCase() == merchantId)
           .toList());
     } catch (_) {
       // Best-effort — the sheet just shows an empty state below.

@@ -188,7 +188,7 @@ class CartGroup {
 }
 
 /// One merchant's part of a checkout, priced by the backend (tier discount,
-/// service fee and PPN are the server's call — never computed in the app).
+/// any older service fee / PPN are the server's call — never computed in the app).
 class CartCheckoutGroup {
   final String merchantId;
   final String storeName;
@@ -245,12 +245,17 @@ class CartCheckoutResult {
   final int? amount;
   final String? paymentError;
 
+  /// Orders with AI designs, waiting for their store to confirm the print
+  /// weight (and price) — paid later from "Pesanan".
+  final int awaitingConfirmation;
+
   const CartCheckoutResult({
     required this.orderIds,
     this.paymentId,
     this.redirectUrl,
     this.amount,
     this.paymentError,
+    this.awaitingConfirmation = 0,
   });
 
   bool get hasPayment => paymentId != null && redirectUrl != null;

@@ -75,10 +75,18 @@ class _CartCheckoutScreenState extends State<CartCheckoutScreen> {
 
   bool get _anyCourier => _groups.any((g) => !_shipFor(g).isPickup);
   int get _grandTotal => _groups.fold(0, (sum, g) => sum + g.totalAmount + _shipFor(g).shippingCost);
+
+  // A store's order holding AI designs waits for the store to confirm the
+  // print weight (= the price) — it's paid later from "Pesanan".
+  bool _awaitsStore(CartCheckoutGroup g) => g.items.any((i) => i.isDesign);
+  bool get _anyAwaiting => _groups.any(_awaitsStore);
+  int get _payNowTotal =>
+      _groups.where((g) => !_awaitsStore(g)).fold(0, (sum, g) => sum + g.totalAmount + _shipFor(g).shippingCost);
+
   bool get _canSubmit =>
       !_submitting &&
       _groups.isNotEmpty &&
-      _paymentMethodId != null &&
+      (_paymentMethodId != null || _payNowTotal == 0) &&
       _groups.every((g) => _shipFor(g).ready) &&
       (!_anyCourier || _address != null);
 
@@ -240,10 +248,15 @@ class _CartCheckoutScreenState extends State<CartCheckoutScreen> {
       // The bought lines are gone from the cart now.
       unawaited(context.read<CartController>().refresh(token));
 
+      const awaitingText = 'Pesanan desain AI dikirim ke toko. Toko akan memeriksa berat cetak dan mengonfirmasi harganya — '
+          'setelah itu kamu bisa membayarnya dari menu Pesanan.';
       if (!result.hasPayment) {
         await _info(
-          'Pesanan sudah dibuat',
-          result.paymentError ?? 'Halaman pembayaran gagal dibuka. Kamu bisa membayar dari menu Pesanan.',
+          result.awaitingConfirmation > 0 && result.paymentError == null ? 'Menunggu konfirmasi toko' : 'Pesanan sudah dibuat',
+          result.paymentError ??
+              (result.awaitingConfirmation > 0
+                  ? awaitingText
+                  : 'Halaman pembayaran gagal dibuka. Kamu bisa membayar dari menu Pesanan.'),
         );
         if (mounted) Navigator.of(context).pop(true);
         return;
@@ -262,6 +275,7 @@ class _CartCheckoutScreenState extends State<CartCheckoutScreen> {
               'kamu bisa melanjutkannya dari menu Pesanan.',
         );
       }
+      if (mounted && result.awaitingConfirmation > 0) await _info('Menunggu konfirmasi toko', awaitingText);
       if (mounted) Navigator.of(context).pop(true);
     } on ApiException catch (e) {
       if (mounted) setState(() => _submitError = e.message);
@@ -314,6 +328,13 @@ class _CartCheckoutScreenState extends State<CartCheckoutScreen> {
                         const SizedBox(height: 10),
                         CheckoutAddressSection(address: _address, onChange: _pickAddress),
                         const SizedBox(height: 18),
+                      ],
+                      if (_anyAwaiting) ...[
+                        const CheckoutInfoNote(
+                          text: 'Desain AI: berat di aplikasi masih perkiraan. Toko akan memeriksa berat cetak dan '
+                              'mengonfirmasi harganya dulu — kamu membayarnya dari menu Pesanan setelah dikonfirmasi.',
+                        ),
+                        const SizedBox(height: 14),
                       ],
                       if (_groups.length > 1) ...[
                         CheckoutInfoNote(
@@ -377,14 +398,18 @@ class _CartCheckoutScreenState extends State<CartCheckoutScreen> {
                       ],
                       const SizedBox(height: 18),
                       GradientButton(
-                        label: _submitting ? 'Memproses...' : 'Bayar ${rupiahLabel(_grandTotal)}',
+                        label: _submitting
+                            ? 'Memproses...'
+                            : _payNowTotal == 0
+                                ? 'Kirim ke Toko untuk Konfirmasi'
+                                : 'Bayar ${rupiahLabel(_payNowTotal)}',
                         icon: _submitting ? null : Icons.lock_rounded,
                         onPressed: _canSubmit ? _submit : null,
                       ),
                       if (!_canSubmit && !_submitting) ...[
                         const SizedBox(height: 8),
                         Text(
-                          _paymentMethodId == null
+                          _paymentMethodId == null && _payNowTotal > 0
                               ? 'Pilih metode pembayaran untuk melanjutkan.'
                               : (_anyCourier && _address == null)
                                   ? 'Tambahkan alamat pengiriman untuk toko yang dikirim kurir.'

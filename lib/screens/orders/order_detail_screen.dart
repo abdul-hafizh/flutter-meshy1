@@ -676,16 +676,20 @@ class _ActionArea extends StatelessWidget {
       );
     }
 
-    if (!order.isPriced) {
+    if (!order.isPriced || (order.awaitingMerchantConfirmation && !order.isPaid)) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _awaitingPriceBanner(),
+        _awaitingPriceBanner(
+          order.awaitingMerchantConfirmation
+              ? 'Toko sedang memeriksa berat cetak desainmu. Harga final dikonfirmasi toko, lalu kamu bisa membayar dari sini.'
+              : 'Menunggu konfirmasi harga dari penjual. Halaman ini akan otomatis diperbarui.',
+        ),
         _cancelButton(),
       ]);
     }
     return _buildPricedArea(context);
   }
 
-  Widget _awaitingPriceBanner() {
+  Widget _awaitingPriceBanner(String message) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -697,10 +701,10 @@ class _ActionArea extends StatelessWidget {
         children: [
           const Icon(Icons.hourglass_top_rounded, size: 20, color: AppColors.orange),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Menunggu konfirmasi harga dari penjual. Halaman ini akan otomatis diperbarui.',
-              style: TextStyle(fontSize: 12.5, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+              message,
+              style: const TextStyle(fontSize: 12.5, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -732,8 +736,8 @@ class _ActionArea extends StatelessWidget {
                 if (hasBreakdown) ...[
                   _priceRow('Harga Barang', rupiah(subtotalAmount)),
                   if (discountAmount > 0) _priceRow(order.tierDiscountLabel, '-${rupiah(discountAmount)}', valueColor: const Color(0xFF1FAA59)),
-                  if (taxAmount != null) _priceRow('PPN', rupiah(taxAmount)),
-                  if (appFeeAmount != null) _priceRow('Biaya Layanan Aplikasi', rupiah(appFeeAmount)),
+                  if (taxAmount != null && taxAmount > 0) _priceRow('PPN', rupiah(taxAmount)),
+                  if (appFeeAmount != null && appFeeAmount > 0) _priceRow('Biaya Layanan Aplikasi', rupiah(appFeeAmount)),
                   const Divider(height: 20, color: AppColors.border),
                 ],
                 Row(

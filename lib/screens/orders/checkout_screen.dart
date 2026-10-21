@@ -503,8 +503,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             if (hasBreakdown) ...[
                               _priceRow('Harga Barang', _rupiah(subtotalAmount)),
                               if (discountAmount > 0) _priceRow(order.tierDiscountLabel, '-${_rupiah(discountAmount)}', valueColor: const Color(0xFF1FAA59)),
-                              if (taxAmount != null) _priceRow('PPN', _rupiah(taxAmount)),
-                              if (appFeeAmount != null) _priceRow('Biaya Layanan Aplikasi', _rupiah(appFeeAmount)),
+                              if (taxAmount != null && taxAmount > 0) _priceRow('PPN', _rupiah(taxAmount)),
+                              if (appFeeAmount != null && appFeeAmount > 0) _priceRow('Biaya Layanan Aplikasi', _rupiah(appFeeAmount)),
                             ] else
                               _priceRow('Harga Barang', _rupiah(itemAmount)),
                             _priceRow(
