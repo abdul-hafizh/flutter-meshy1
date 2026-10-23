@@ -1,4 +1,5 @@
 import 'merchant_queue_status.dart';
+import '../services/api_config.dart';
 import '../utils/sold_format.dart';
 import 'operating_status.dart';
 
@@ -59,7 +60,7 @@ class NearbyMerchant {
     return NearbyMerchant(
       id: json['Id']?.toString() ?? '',
       fullName: json['FullName']?.toString() ?? 'Merchant',
-      avatar: json['Avatar']?.toString(),
+      avatar: ApiConfig.assetUrlOrNull(json['Avatar']?.toString()),
       address: company is Map<String, dynamic> ? company['Address']?.toString() : null,
       // CityName: the company's city, else the merchant's own address city.
       cityName: json['CityName']?.toString() ?? (city is Map<String, dynamic> ? city['Name']?.toString() : null),

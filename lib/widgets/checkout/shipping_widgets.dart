@@ -55,7 +55,7 @@ String? instantShippingHint({
     return 'Pengiriman Instan (Gojek/Grab) butuh titik lokasi alamatmu. Ubah alamat lalu tekan "Gunakan Lokasi Saat Ini" untuk mengaktifkannya.';
   }
   if (!originHasCoordinates) {
-    return 'Pengiriman Instan (Gojek/Grab) belum tersedia karena lokasi toko penjual belum diatur.';
+    return 'Pengiriman Instan (Gojek/Grab) belum tersedia karena penjual belum menandai titik lokasi tokonya di peta. Kurir reguler & kargo tetap bisa dipilih.';
   }
   return null;
 }

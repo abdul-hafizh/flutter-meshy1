@@ -66,6 +66,13 @@ class ApiConfig {
   /// `Image.network` can actually load — a bare path has no scheme/host, so
   /// it silently fails to load without this. Already-absolute URLs pass
   /// through unchanged.
+  /// [assetUrl] for an optional path (e.g. an uploaded "/uploads/avatars/…"
+  /// photo); null/blank stays null so callers can show an icon instead.
+  static String? assetUrlOrNull(String? path) {
+    final p = path?.trim();
+    return p == null || p.isEmpty ? null : assetUrl(p);
+  }
+
   static String assetUrl(String path) {
     if (path.startsWith('http://') || path.startsWith('https://')) return path;
     return '$_origin${path.startsWith('/') ? '' : '/'}$path';

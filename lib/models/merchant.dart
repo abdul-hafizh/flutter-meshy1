@@ -1,3 +1,5 @@
+import '../services/api_config.dart';
+
 class Merchant {
   final String id;
   final String fullName;
@@ -10,7 +12,7 @@ class Merchant {
     return Merchant(
       id: json['Id']?.toString() ?? '',
       fullName: json['FullName']?.toString() ?? '',
-      avatar: json['Avatar']?.toString(),
+      avatar: ApiConfig.assetUrlOrNull(json['Avatar']?.toString()),
       address: json['Address']?.toString(),
     );
   }

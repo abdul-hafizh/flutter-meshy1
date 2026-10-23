@@ -193,7 +193,7 @@ class AssignedMerchantInfo {
     return AssignedMerchantInfo(
       id: json['Id']?.toString() ?? '',
       fullName: json['FullName']?.toString() ?? 'Merchant',
-      avatar: json['Avatar']?.toString(),
+      avatar: ApiConfig.assetUrlOrNull(json['Avatar']?.toString()),
       cityName: city is Map<String, dynamic> ? city['Name']?.toString() : null,
       provinceName: province is Map<String, dynamic> ? province['Name']?.toString() : null,
       countryName: country is Map<String, dynamic> ? country['Name']?.toString() : null,

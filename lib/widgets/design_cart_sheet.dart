@@ -223,7 +223,7 @@ class _DesignCartSheetState extends State<_DesignCartSheet> {
                       ),
                       const SizedBox(height: 4),
                       const Text(
-                        'Belum termasuk ongkir (dihitung saat checkout).',
+                        'Belum termasuk PPN & ongkir (dihitung saat checkout).',
                         style: TextStyle(fontSize: 11.5, color: AppColors.textFaint),
                       ),
                       const SizedBox(height: 16),

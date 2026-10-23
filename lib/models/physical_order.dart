@@ -1,4 +1,5 @@
 import 'ai_job.dart';
+import '../services/api_config.dart';
 import 'operating_status.dart';
 
 class OrderStatusInfo {
@@ -47,7 +48,7 @@ class OrderMerchantInfo {
     return OrderMerchantInfo(
       id: json['Id']?.toString() ?? '',
       fullName: json['FullName']?.toString() ?? 'Penjual',
-      avatar: json['Avatar']?.toString(),
+      avatar: ApiConfig.assetUrlOrNull(json['Avatar']?.toString()),
       operatingStatus: OperatingStatus.tryParse(json['OperatingStatus']),
     );
   }

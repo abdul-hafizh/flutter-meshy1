@@ -1,4 +1,5 @@
 import '../utils/sold_format.dart';
+import '../services/api_config.dart';
 import 'operating_status.dart';
 
 /// A ready-made product a merchant sells directly (already priced, with
@@ -60,7 +61,7 @@ class Product {
       categoryName: category is Map<String, dynamic> ? category['Name']?.toString() : null,
       sellerId: seller is Map<String, dynamic> ? seller['Id']?.toString() : json['SellerId']?.toString(),
       sellerName: seller is Map<String, dynamic> ? seller['FullName']?.toString() : null,
-      sellerAvatar: seller is Map<String, dynamic> ? seller['Avatar']?.toString() : null,
+      sellerAvatar: seller is Map<String, dynamic> ? ApiConfig.assetUrlOrNull(seller['Avatar']?.toString()) : null,
       sellerStatus: seller is Map<String, dynamic> ? OperatingStatus.tryParse(seller['OperatingStatus']) : null,
       isPublished: json['IsPublished'] == true || json['IsPublished'] == 1,
       avgRating: json['AvgRating'] is num ? (json['AvgRating'] as num).toDouble() : double.tryParse('${json['AvgRating']}'),

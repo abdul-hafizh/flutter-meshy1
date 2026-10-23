@@ -216,6 +216,9 @@ class CartGroup {
 class CartCheckoutGroup {
   final String merchantId;
   final String storeName;
+
+  /// The store's photo (absolute URL), null = show an icon.
+  final String? merchantAvatar;
   final List<CartLine> items;
   final int subtotalAmount;
   final int discountAmount;
@@ -231,6 +234,7 @@ class CartCheckoutGroup {
   const CartCheckoutGroup({
     required this.merchantId,
     required this.storeName,
+    this.merchantAvatar,
     required this.items,
     required this.subtotalAmount,
     required this.discountAmount,
@@ -247,6 +251,7 @@ class CartCheckoutGroup {
     return CartCheckoutGroup(
       merchantId: json['MerchantId']?.toString() ?? '',
       storeName: json['StoreName']?.toString() ?? 'Toko',
+      merchantAvatar: ApiConfig.assetUrlOrNull(json['MerchantAvatar']?.toString()),
       operatingStatus: OperatingStatus.tryParse(json['OperatingStatus']),
       items: (json['Items'] as List<dynamic>? ?? []).map((e) => CartLine.fromJson(e as Map<String, dynamic>)).toList(),
       subtotalAmount: _asInt(json['SubtotalAmount']),

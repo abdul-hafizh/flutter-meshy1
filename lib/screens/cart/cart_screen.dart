@@ -276,7 +276,7 @@ class _CartScreenState extends State<CartScreen> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const Text('Total harga barang', style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
+                        const Text('Total harga barang (belum termasuk PPN & ongkir)', style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
                         Text(
                           rupiahLabel(_selectedTotal),
                           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary),

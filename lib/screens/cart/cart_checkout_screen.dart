@@ -468,8 +468,15 @@ class _StoreCheckoutCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.storefront_rounded, size: 18, color: AppColors.purple),
-              const SizedBox(width: 6),
+              CircleAvatar(
+                radius: 14,
+                backgroundColor: AppColors.surfaceMuted,
+                backgroundImage: group.merchantAvatar != null ? NetworkImage(group.merchantAvatar!) : null,
+                child: group.merchantAvatar == null
+                    ? const Icon(Icons.storefront_rounded, size: 15, color: AppColors.purple)
+                    : null,
+              ),
+              const SizedBox(width: 8),
               Flexible(
                 child: Text(
                   group.storeName,
