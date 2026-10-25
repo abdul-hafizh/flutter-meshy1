@@ -55,7 +55,7 @@ class AiJobService {
     required String merchantId,
     required String prompt,
     String artStyle = 'realistic',
-    String? negativePrompt,
+    String? colorType,
     String? note,
     double? length,
     double? width,
@@ -71,8 +71,7 @@ class AiJobService {
               'MerchantId': merchantId,
               'prompt': prompt,
               'artStyle': artStyle,
-              if (negativePrompt != null && negativePrompt.trim().isNotEmpty)
-                'negativePrompt': negativePrompt.trim(),
+              if (colorType != null) 'ColorType': colorType,
               if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
               if (length != null) 'TargetLength': length,
               if (width != null) 'TargetWidth': width,
@@ -103,7 +102,7 @@ class AiJobService {
     required List<ImageUpload> images,
     String? prompt,
     String artStyle = 'realistic',
-    String? negativePrompt,
+    String? colorType,
     String? note,
     double? length,
     double? width,
@@ -134,9 +133,7 @@ class AiJobService {
       if (prompt != null && prompt.trim().isNotEmpty) {
         request.fields['prompt'] = prompt.trim();
       }
-      if (negativePrompt != null && negativePrompt.trim().isNotEmpty) {
-        request.fields['negativePrompt'] = negativePrompt.trim();
-      }
+      if (colorType != null) request.fields['ColorType'] = colorType;
       if (note != null && note.trim().isNotEmpty) {
         request.fields['note'] = note.trim();
       }

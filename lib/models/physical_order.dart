@@ -92,6 +92,15 @@ class PhysicalOrderItem {
   /// The text prompt behind [aiModel], if it was a text-to-3D job.
   final String? aiPrompt;
 
+  /// SINGLE (satu warna) or MULTI (multicolor), set by the store on a custom order.
+  final String? colorType;
+
+  String? get colorTypeLabel => switch (colorType?.toUpperCase()) {
+        'MULTI' => 'Multicolor',
+        'SINGLE' => 'Satu warna',
+        _ => null,
+      };
+
   const PhysicalOrderItem({
     required this.id,
     this.quantity,
@@ -100,6 +109,7 @@ class PhysicalOrderItem {
     this.product,
     this.aiOwnerUserId,
     this.aiPrompt,
+    this.colorType,
   });
 
   factory PhysicalOrderItem.fromJson(Map<String, dynamic> json) {
@@ -113,6 +123,7 @@ class PhysicalOrderItem {
       product: json['Product'] is Map<String, dynamic> ? OrderProductInfo.fromJson(json['Product'] as Map<String, dynamic>) : null,
       aiOwnerUserId: jobJson?['UserId']?.toString(),
       aiPrompt: jobJson?['Prompt']?.toString(),
+      colorType: json['ColorType']?.toString(),
     );
   }
 }
@@ -295,6 +306,10 @@ class PhysicalOrder {
   /// the customer sent over chat).
   final List<OrderPrintFile> printFiles;
 
+  /// When the system completes this shipped order if the customer doesn't
+  /// confirm receipt (admin's Selesai Otomatis); null when it won't.
+  final DateTime? autoCompleteAt;
+
   const PhysicalOrder({
     required this.id,
     this.orderNumber,
@@ -316,6 +331,7 @@ class PhysicalOrder {
     this.payments = const [],
     this.statusHistories = const [],
     this.printFiles = const [],
+    this.autoCompleteAt,
   });
 
   factory PhysicalOrder.fromJson(Map<String, dynamic> json) {
@@ -333,6 +349,7 @@ class PhysicalOrder {
       rating: json['Rating'] is int ? json['Rating'] as int : int.tryParse('${json['Rating']}'),
       ratingNotes: json['RatingNotes']?.toString(),
       createdAt: DateTime.tryParse(json['CreatedAt']?.toString() ?? ''),
+      autoCompleteAt: DateTime.tryParse(json['AutoCompleteAt']?.toString() ?? '')?.toLocal(),
       merchant: json['Merchant'] is Map<String, dynamic> ? OrderMerchantInfo.fromJson(json['Merchant'] as Map<String, dynamic>) : null,
       items: (json['Items'] as List<dynamic>? ?? []).map((e) => PhysicalOrderItem.fromJson(e as Map<String, dynamic>)).toList(),
       shippingAddress: json['ShippingAddress'] is Map<String, dynamic>

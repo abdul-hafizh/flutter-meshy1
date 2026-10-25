@@ -4,10 +4,12 @@ import '../models/product.dart';
 import '../providers/auth_controller.dart';
 import '../services/auth_service.dart' show ApiException;
 import '../services/product_service.dart';
+import '../services/promotion_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/cart_icon_button.dart';
 import '../widgets/home/delivery_address_bar.dart';
 import '../widgets/home/nearby_stores_section.dart';
+import '../widgets/home/promo_popup.dart';
 import '../widgets/product_card.dart';
 import '../widgets/section_header.dart';
 import '../widgets/token_balance_badge.dart';
@@ -34,10 +36,27 @@ class HomeScreenState extends State<HomeScreen> {
   bool _loadingProducts = true;
   String? _loadError;
 
+  /// The promo pop-up shows once per app launch (not on every return to Home).
+  static bool _promoShown = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_readyProducts == null) _loadProducts();
+    if (!_promoShown) _showPromos();
+  }
+
+  Future<void> _showPromos() async {
+    final token = context.read<AuthController>().token;
+    if (token == null) return;
+    _promoShown = true;
+    try {
+      final promos = await PromotionService.active(token: token);
+      if (!mounted || promos.isEmpty) return;
+      await showPromoPopup(context, promos);
+    } on ApiException {
+      // No pop-up this time.
+    }
   }
 
   Future<void> _loadProducts() async {

@@ -298,6 +298,19 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                             ),
                             const SizedBox(height: 16),
                             _ModelPreview(item: order.primaryItem),
+                            if (order.primaryItem?.colorTypeLabel != null) ...[
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  const Icon(Icons.palette_outlined, size: 16, color: AppColors.textSecondary),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Jenis warna: ${order.primaryItem!.colorTypeLabel}',
+                                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                  ),
+                                ],
+                              ),
+                            ],
                             if (order.printFiles.isNotEmpty) ...[
                               const SizedBox(height: 14),
                               _PrintFilesCard(files: order.printFiles),
@@ -951,6 +964,22 @@ class _ActionArea extends StatelessWidget {
             icon: Icons.check_circle_outline_rounded,
             onPressed: confirmingReceipt ? null : onConfirmReceipt,
           ),
+          if (order.autoCompleteAt != null) ...[
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.schedule_rounded, size: 16, color: AppColors.textSecondary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Pesanan otomatis selesai pada ${_autoCompleteDate(order.autoCompleteAt!)} bila belum dikonfirmasi diterima.',
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.35),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
         if (order.status?.isCompleted == true && order.rating == null) ...[
           const SizedBox(height: 14),
@@ -1083,4 +1112,11 @@ class _ErrorState extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "08 Nov 2026, 14.30" — the auto-complete deadline under "Pesanan Diterima".
+String _autoCompleteDate(DateTime dt) {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(dt.day)} ${months[dt.month - 1]} ${dt.year}, ${two(dt.hour)}.${two(dt.minute)}';
 }
