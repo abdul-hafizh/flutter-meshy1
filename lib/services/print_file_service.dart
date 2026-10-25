@@ -17,7 +17,7 @@ class PrintFileService {
 
   static Uri _uri(String path) => Uri.parse('${ApiConfig.baseUrl}$path');
 
-  /// Material names from the admin's price master (PLA, ABS, TPU, …).
+  /// Material names from the admin's price master (PLA, ABS/PETG, TPU, …).
   static Future<List<String>> materials({required String token}) async {
     http.Response res;
     try {

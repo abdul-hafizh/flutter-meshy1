@@ -2,6 +2,11 @@ import 'ai_job.dart';
 import '../services/api_config.dart';
 import 'operating_status.dart';
 
+/// Item categories (same as the backend's utils/itemCategory.js): a ready-made
+/// product ("Barang Jadi") keeps its own name; the others are named after these.
+const kItemCategoryPrompt = 'File Via Prompt';
+const kItemCategoryPrintFile = 'File Siap Print';
+
 class OrderStatusInfo {
   final int id;
   final String name;
@@ -229,6 +234,39 @@ enum OrderTab { unpaid, packing, shipped, review, history }
 /// A physical 3D-print order (`Orders` on the backend, excluding
 /// AI-credit purchases). Distinct from an [AiJobSummary] — an order only
 /// exists once the customer has picked a merchant for a finished job.
+class OrderPrintFile {
+  final String id;
+  final String fileName;
+  final int fileSize;
+  final String? materialName;
+  final int quantity;
+
+  const OrderPrintFile({
+    required this.id,
+    required this.fileName,
+    required this.fileSize,
+    this.materialName,
+    this.quantity = 1,
+  });
+
+  factory OrderPrintFile.fromJson(Map<String, dynamic> json) {
+    int toInt(dynamic v, int fallback) => v is int ? v : int.tryParse('$v') ?? fallback;
+    return OrderPrintFile(
+      id: json['Id']?.toString() ?? '',
+      fileName: json['FileName']?.toString() ?? 'File cetak',
+      fileSize: toInt(json['FileSize'], 0),
+      materialName: json['MaterialName']?.toString(),
+      quantity: toInt(json['Quantity'], 1),
+    );
+  }
+
+  String get sizeLabel {
+    if (fileSize >= 1024 * 1024) return '${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB';
+    if (fileSize >= 1024) return '${(fileSize / 1024).round()} KB';
+    return '$fileSize B';
+  }
+}
+
 class PhysicalOrder {
   final String id;
   final String? orderNumber;
@@ -253,6 +291,10 @@ class PhysicalOrder {
   final List<PaymentInfo> payments;
   final List<OrderStatusHistoryEntry> statusHistories;
 
+  /// Ready-to-print files a store's Pesanan Custom was made from (the ones
+  /// the customer sent over chat).
+  final List<OrderPrintFile> printFiles;
+
   const PhysicalOrder({
     required this.id,
     this.orderNumber,
@@ -273,6 +315,7 @@ class PhysicalOrder {
     this.shipments = const [],
     this.payments = const [],
     this.statusHistories = const [],
+    this.printFiles = const [],
   });
 
   factory PhysicalOrder.fromJson(Map<String, dynamic> json) {
@@ -299,6 +342,10 @@ class PhysicalOrder {
       payments: (json['Payments'] as List<dynamic>? ?? []).map((e) => PaymentInfo.fromJson(e as Map<String, dynamic>)).toList(),
       statusHistories: (json['StatusHistories'] as List<dynamic>? ?? [])
           .map((e) => OrderStatusHistoryEntry.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      printFiles: (json['PrintFiles'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(OrderPrintFile.fromJson)
           .toList(),
     );
   }
@@ -328,26 +375,17 @@ class PhysicalOrder {
     final owner = item?.aiOwnerUserId;
     final isOwnDesign = model != null &&
         (owner == null || customerUserId == null || owner.toLowerCase() == customerUserId.toLowerCase());
+    // Non-product items are named after their category (same as the backend).
     if (isOwnDesign) {
-      final prompt = item?.aiPrompt?.trim();
-      final title = prompt != null && prompt.isNotEmpty
-          ? prompt
-          : model.modelName.trim().isNotEmpty
-              ? model.modelName.trim()
-              : 'Desain AI';
       final preview = model.previewUrl;
       return OrderDisplay(
         kind: OrderKind.aiDesign,
-        title: title,
+        title: kItemCategoryPrompt,
         imageUrl: preview != null && preview.isNotEmpty ? preview : null,
       );
     }
 
-    // Custom orders store "itemName - extra notes" (or just the item name).
-    final note = notes?.trim() ?? '';
-    final firstLine = note.split('\n').first;
-    final name = firstLine.split(' - ').first.trim();
-    return OrderDisplay(kind: OrderKind.custom, title: name.isNotEmpty ? name : 'Pesanan Custom');
+    return const OrderDisplay(kind: OrderKind.custom, title: kItemCategoryPrintFile);
   }
 
   bool get isPriced => (totalAmount ?? 0) > 0;

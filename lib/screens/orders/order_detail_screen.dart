@@ -298,6 +298,10 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                             ),
                             const SizedBox(height: 16),
                             _ModelPreview(item: order.primaryItem),
+                            if (order.printFiles.isNotEmpty) ...[
+                              const SizedBox(height: 14),
+                              _PrintFilesCard(files: order.printFiles),
+                            ],
                             if (order.merchant != null) ...[
                               const SizedBox(height: 14),
                               _MerchantSummaryCard(merchant: order.merchant!),
@@ -359,6 +363,59 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                         ),
         ),
       ],
+    );
+  }
+}
+
+/// The ready-to-print files this order is made from (Pesanan Custom).
+class _PrintFilesCard extends StatelessWidget {
+  final List<OrderPrintFile> files;
+
+  const _PrintFilesCard({required this.files});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('File yang Dicetak', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+          const SizedBox(height: 8),
+          for (final f in files)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(
+                children: [
+                  const Icon(Icons.view_in_ar_rounded, size: 20, color: AppColors.purple),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          f.fileName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                        ),
+                        Text(
+                          [f.sizeLabel, if (f.materialName != null) 'Bahan ${f.materialName}', '${f.quantity} pcs'].join(' · '),
+                          style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

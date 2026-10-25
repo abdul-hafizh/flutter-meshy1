@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_controller.dart';
+import '../services/user_address_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/gradient_button.dart';
 import 'addresses/address_list_screen.dart';
@@ -13,10 +14,10 @@ String _formatBirthDate(DateTime d) => '${d.day} ${_monthNames[d.month - 1]} ${d
 String _isoDate(DateTime d) =>
     '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-/// The customer's own profile: photo, name, gender, date of birth, phone
-/// and WhatsApp. Email is fixed (it's the login identity) and shown
-/// read-only; shipping addresses (with their map pin) are managed in
-/// "Alamat Pengiriman".
+/// The customer's own profile: photo, name, gender, date of birth and one
+/// phone number (required — also used as their WhatsApp). Email is fixed
+/// (it's the login identity) and shown read-only; at least one shipping
+/// address is required, managed in "Alamat Pengiriman".
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
 
@@ -28,7 +29,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameCtrl;
   late final TextEditingController _phoneCtrl;
-  late final TextEditingController _whatsappCtrl;
   String? _gender;
   DateTime? _birthDate;
 
@@ -36,13 +36,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _uploadingPhoto = false;
   String? _error;
 
+  /// Saved shipping addresses; null while loading (or if it couldn't load).
+  int? _addressCount;
+
   @override
   void initState() {
     super.initState();
     final user = context.read<AuthController>().user;
     _nameCtrl = TextEditingController(text: user?.fullName ?? '');
-    _phoneCtrl = TextEditingController(text: user?.phone ?? '');
-    _whatsappCtrl = TextEditingController(text: user?.whatsappNumber ?? '');
+    // One number: older accounts may only have the WhatsApp one filled in.
+    final phone = (user?.phone ?? '').trim();
+    _phoneCtrl = TextEditingController(text: phone.isNotEmpty ? phone : (user?.whatsappNumber ?? ''));
+    _loadAddressCount();
     _gender = user?.gender;
     _birthDate = user?.birthDate != null ? DateTime.tryParse(user!.birthDate!) : null;
   }
@@ -51,7 +56,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void dispose() {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
-    _whatsappCtrl.dispose();
     super.dispose();
   }
 
@@ -102,8 +106,37 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (picked != null) setState(() => _birthDate = picked);
   }
 
+  Future<void> _loadAddressCount() async {
+    final token = context.read<AuthController>().token;
+    if (token == null) return;
+    try {
+      final list = await UserAddressService.listMine(token: token);
+      if (mounted) setState(() => _addressCount = list.length);
+    } catch (_) {
+      // Leave unknown — saving re-checks.
+    }
+  }
+
+  Future<void> _openAddresses() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AddressListScreen()));
+    if (mounted) _loadAddressCount();
+  }
+
+  static String? _validatePhone(String? v) {
+    final digits = (v ?? '').replaceAll(RegExp(r'[\s\-()]'), '');
+    if (digits.isEmpty) return 'Nomor HP wajib diisi';
+    if (!RegExp(r'^\+?\d{9,15}$').hasMatch(digits)) return 'Nomor HP tidak valid (9–15 angka)';
+    return null;
+  }
+
   Future<void> _save() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (_addressCount == null) await _loadAddressCount();
+    if (!mounted) return;
+    if (_addressCount == 0) {
+      setState(() => _error = 'Alamat pengiriman wajib diisi. Tambahkan minimal satu alamat.');
+      return;
+    }
     setState(() {
       _submitting = true;
       _error = null;
@@ -112,7 +145,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final error = await context.read<AuthController>().updateProfile(
           fullName: _nameCtrl.text.trim(),
           phone: _phoneCtrl.text.trim(),
-          whatsappNumber: _whatsappCtrl.text.trim(),
+          // The same number is their WhatsApp.
+          whatsappNumber: _phoneCtrl.text.trim(),
           gender: _gender ?? '',
           birthDate: _birthDate != null ? _isoDate(_birthDate!) : '',
         );
@@ -268,19 +302,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               TextFormField(
                 controller: _phoneCtrl,
                 keyboardType: TextInputType.phone,
-                decoration: _decoration('Nomor HP'),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _whatsappCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: _decoration('Nomor WhatsApp (opsional)'),
+                decoration: _decoration('Nomor HP *', hint: '08xxxxxxxxxx'),
+                validator: _validatePhone,
               ),
               const SizedBox(height: 4),
               const Padding(
                 padding: EdgeInsets.only(left: 4),
                 child: Text(
-                  'Nomor HP & WhatsApp dipakai toko untuk menghubungimu soal pesanan.',
+                  'Wajib diisi. Nomor ini juga dipakai sebagai WhatsApp agar toko bisa menghubungimu soal pesanan.',
                   style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
                 ),
               ),
@@ -305,13 +334,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 child: ListTile(
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
-                    side: const BorderSide(color: AppColors.border),
+                    side: BorderSide(color: _addressCount == 0 ? const Color(0xFFE0453A) : AppColors.border),
                   ),
                   leading: const Icon(Icons.location_on_outlined, color: AppColors.purple),
-                  title: const Text('Alamat Pengiriman', style: TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: const Text('Atur alamat & titik lokasi di peta'),
+                  title: const Text('Alamat Pengiriman *', style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: Text(
+                    _addressCount == 0
+                        ? 'Wajib diisi — tambahkan minimal satu alamat'
+                        : _addressCount == null
+                            ? 'Atur alamat & titik lokasi di peta'
+                            : '$_addressCount alamat tersimpan · atur alamat & titik lokasi',
+                    style: TextStyle(color: _addressCount == 0 ? const Color(0xFFE0453A) : null),
+                  ),
                   trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AddressListScreen())),
+                  onTap: _openAddresses,
                 ),
               ),
               if (_error != null) ...[
