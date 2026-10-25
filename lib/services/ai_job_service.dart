@@ -211,6 +211,30 @@ class AiJobService {
     decodeApiResponse(res);
   }
 
+  /// A 5-minute link to download the design as [format] (e.g. STL, 3MF),
+  /// opened in the system browser — the login token never goes in the URL.
+  static Future<Uri> modelDownloadUri({required String token, required String jobId, required String format}) async {
+    http.Response res;
+    try {
+      res = await http
+          .post(
+            _uri('/ai/jobs/$jobId/download-link'),
+            headers: _headers(token),
+            body: jsonEncode({'format': format}),
+          )
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
+    }
+    final data = decodeApiResponse(res, fallbackMessage: 'Gagal menyiapkan file.')['data'] as Map<String, dynamic>;
+    final path = data['path']?.toString();
+    final linkToken = data['token']?.toString();
+    if (path == null || linkToken == null) {
+      throw ApiException('Respon server tidak valid.');
+    }
+    return Uri.parse('${ApiConfig.baseUrl}$path').replace(queryParameters: {'token': linkToken});
+  }
+
   static Future<AiJobDetail> getJobDetail({required String token, required String jobId}) async {
     http.Response res;
     try {

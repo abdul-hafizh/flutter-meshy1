@@ -48,6 +48,9 @@ class _CreateScreenState extends State<CreateScreen> {
   bool _hasText = false;
   bool _generating = false;
 
+  /// Set after a Generate tap with a missing size, so the empty fields turn red.
+  bool _showDimErrors = false;
+
   /// The store that will print the design — must be chosen before the
   /// prompt; the finished design then goes into the cart for this store.
   NearbyMerchant? _store;
@@ -65,6 +68,12 @@ class _CreateScreenState extends State<CreateScreen> {
       final hasText = _controller.text.trim().isNotEmpty;
       if (hasText != _hasText) setState(() => _hasText = hasText);
     });
+    // Clear a field's red border as soon as it's filled in.
+    for (final c in [_lengthController, _widthController, _heightController]) {
+      c.addListener(() {
+        if (_showDimErrors) setState(() {});
+      });
+    }
   }
 
   @override
@@ -79,6 +88,14 @@ class _CreateScreenState extends State<CreateScreen> {
   }
 
   double? _parseDim(String text) => double.tryParse(text.trim().replaceAll(',', '.'));
+
+  /// A size in cm that can be printed: a number above 0.
+  bool _validDim(TextEditingController c) {
+    final v = _parseDim(c.text);
+    return v != null && v > 0;
+  }
+
+  bool get _hasDims => _validDim(_lengthController) && _validDim(_widthController) && _validDim(_heightController);
 
   bool get _canGenerate =>
       _store != null && (_mode == _CreateMode.text ? _hasText : _pickedImages.isNotEmpty);
@@ -113,6 +130,15 @@ class _CreateScreenState extends State<CreateScreen> {
   Future<void> _generate() async {
     if (!_canGenerate || _generating) return;
     final store = _store!;
+
+    // The size drives the weight estimate, and so the print price.
+    if (!_hasDims) {
+      setState(() => _showDimErrors = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Isi panjang, lebar, dan tinggi hasil cetak (cm) terlebih dahulu.')),
+      );
+      return;
+    }
 
     final auth = context.read<AuthController>();
     final token = auth.token;
@@ -188,6 +214,7 @@ class _CreateScreenState extends State<CreateScreen> {
       _widthController.clear();
       _heightController.clear();
       setState(() {
+        _showDimErrors = false;
         _pickedImages.clear();
         _pickedImageBytesList.clear();
       });
@@ -411,8 +438,11 @@ class _CreateScreenState extends State<CreateScreen> {
             ),
           ),
           const SizedBox(height: 22),
-          const Text(
-            'Dimensi Hasil Cetak (cm, opsional)',
+          const Text.rich(
+            TextSpan(
+              text: 'Dimensi Hasil Cetak (cm) ',
+              children: [TextSpan(text: '*', style: TextStyle(color: Colors.red))],
+            ),
             style: TextStyle(
               fontSize: 14.5,
               fontWeight: FontWeight.w700,
@@ -421,22 +451,34 @@ class _CreateScreenState extends State<CreateScreen> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Bantu merchant memperkirakan bahan & harga cetak',
+            'Wajib diisi — dipakai untuk memperkirakan berat bahan & harga cetak',
             style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
-                child: _DimensionField(label: 'Panjang', controller: _lengthController),
+                child: _DimensionField(
+                  label: 'Panjang',
+                  controller: _lengthController,
+                  error: _showDimErrors && !_validDim(_lengthController),
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _DimensionField(label: 'Lebar', controller: _widthController),
+                child: _DimensionField(
+                  label: 'Lebar',
+                  controller: _widthController,
+                  error: _showDimErrors && !_validDim(_widthController),
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _DimensionField(label: 'Tinggi', controller: _heightController),
+                child: _DimensionField(
+                  label: 'Tinggi',
+                  controller: _heightController,
+                  error: _showDimErrors && !_validDim(_heightController),
+                ),
               ),
             ],
           ),
@@ -538,8 +580,9 @@ class _CreateScreenState extends State<CreateScreen> {
 class _DimensionField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
+  final bool error;
 
-  const _DimensionField({required this.label, required this.controller});
+  const _DimensionField({required this.label, required this.controller, this.error = false});
 
   @override
   Widget build(BuildContext context) {
@@ -555,7 +598,7 @@ class _DimensionField extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.surfaceMuted,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: error ? Colors.red : AppColors.border),
           ),
           child: TextField(
             controller: controller,
@@ -572,6 +615,10 @@ class _DimensionField extends StatelessWidget {
             ),
           ),
         ),
+        if (error) ...[
+          const SizedBox(height: 4),
+          const Text('Wajib diisi', style: TextStyle(fontSize: 11.5, color: Colors.red)),
+        ],
       ],
     );
   }

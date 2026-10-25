@@ -275,11 +275,27 @@ class _JobDetailViewState extends State<JobDetailView> {
     }
   }
 
-  Future<void> _openFile(String? url) async {
-    if (url == null) return;
-    final uri = Uri.tryParse(url);
-    if (uri == null) return;
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  String? _downloading;
+
+  Future<void> _download(ModelDownloadFormat format) async {
+    final token = _token;
+    if (token == null || _downloading != null) return;
+    setState(() => _downloading = format.code);
+    try {
+      final uri = await AiJobService.modelDownloadUri(token: token, jobId: widget.jobId, format: format.code);
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) throw ApiException('Tidak dapat membuka unduhan. Coba lagi.');
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal mengunduh file ${format.label}. Coba lagi.')),
+      );
+    } finally {
+      if (mounted) setState(() => _downloading = null);
+    }
   }
 
   @override
@@ -411,6 +427,7 @@ class _JobDetailViewState extends State<JobDetailView> {
                                 ),
                             ],
                             if (detail.primaryModel != null) ...[
+                              if (detail.downloadFormats.isNotEmpty) ...[
                               const SizedBox(height: 18),
                               const Text(
                                 'Unduh Model',
@@ -425,17 +442,15 @@ class _JobDetailViewState extends State<JobDetailView> {
                                 spacing: 10,
                                 runSpacing: 10,
                                 children: [
-                                  for (final entry in {
-                                    'GLB': detail.primaryModel!.glbUrl,
-                                    'STL': detail.primaryModel!.stlUrl,
-                                    'OBJ': detail.primaryModel!.objUrl,
-                                    'FBX': detail.primaryModel!.fbxUrl,
-                                    'USDZ': detail.primaryModel!.usdzUrl,
-                                  }.entries)
-                                    if (entry.value != null)
-                                      _FileChip(label: entry.key, onTap: () => _openFile(entry.value)),
+                                  for (final format in detail.downloadFormats)
+                                    _FileChip(
+                                      label: format.label,
+                                      loading: _downloading == format.code,
+                                      onTap: () => _download(format),
+                                    ),
                                 ],
                               ),
+                              ],
                               const SizedBox(height: 22),
                               if (detail.usesCart)
                                 const SizedBox.shrink()
@@ -687,9 +702,10 @@ class _StatusPill extends StatelessWidget {
 
 class _FileChip extends StatelessWidget {
   final String label;
+  final bool loading;
   final VoidCallback onTap;
 
-  const _FileChip({required this.label, required this.onTap});
+  const _FileChip({required this.label, required this.onTap, this.loading = false});
 
   @override
   Widget build(BuildContext context) {
@@ -708,7 +724,13 @@ class _FileChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.download_rounded, size: 16, color: AppColors.purple),
+              loading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.purple),
+                    )
+                  : const Icon(Icons.download_rounded, size: 16, color: AppColors.purple),
               const SizedBox(width: 6),
               Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
             ],

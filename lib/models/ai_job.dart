@@ -60,6 +60,26 @@ class AiModelFile {
   }
 }
 
+/// A file type the customer may download for this design — the admin's
+/// active list (dashboard › Aktivitas Meshy) that this model is available in.
+class ModelDownloadFormat {
+  final String code;
+  final String label;
+  final String? description;
+
+  const ModelDownloadFormat({required this.code, required this.label, this.description});
+
+  factory ModelDownloadFormat.fromJson(Map<String, dynamic> json) {
+    final code = json['Code']?.toString().toUpperCase() ?? '';
+    final label = json['Label']?.toString() ?? '';
+    return ModelDownloadFormat(
+      code: code,
+      label: label.isEmpty ? code : label,
+      description: json['Description']?.toString(),
+    );
+  }
+}
+
 class AiModelPreview {
   final String id;
   final String previewPath;
@@ -239,6 +259,9 @@ class AiJobDetail {
   /// The design's cart line, when it's already in the cart.
   final String? cartItemId;
 
+  /// File types offered under "Unduh Model".
+  final List<ModelDownloadFormat> downloadFormats;
+
   const AiJobDetail({
     required this.id,
     this.prompt,
@@ -252,6 +275,7 @@ class AiJobDetail {
     this.assignedOrderId,
     this.store,
     this.cartItemId,
+    this.downloadFormats = const [],
   });
 
   factory AiJobDetail.fromJson(Map<String, dynamic> json) {
@@ -276,6 +300,11 @@ class AiJobDetail {
           ? AssignedMerchantInfo.fromJson(json['Store'] as Map<String, dynamic>)
           : null,
       cartItemId: json['CartItemId']?.toString(),
+      downloadFormats: (json['DownloadFormats'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(ModelDownloadFormat.fromJson)
+          .where((f) => f.code.isNotEmpty)
+          .toList(),
     );
   }
 
