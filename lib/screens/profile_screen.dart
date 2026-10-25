@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../data/dummy_data.dart';
 import '../providers/auth_controller.dart';
 import '../providers/chat_controller.dart';
+import '../services/tier_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_version_text.dart';
 import 'addresses/address_list_screen.dart';
@@ -16,9 +17,24 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  /// Tiers from the admin's Master Tier; the built-in list until it loads.
+  List<LoyaltyTier> _tiers = kLoyaltyTiers;
+
+  Future<void> _loadTiers() async {
+    final token = context.read<AuthController>().token;
+    if (token == null) return;
+    try {
+      final tiers = await TierService.list(token: token);
+      if (mounted && tiers.isNotEmpty) setState(() => _tiers = tiers);
+    } catch (_) {
+      // Keep the built-in list.
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _loadTiers();
     // UserLevel/TotalSpent/DiscountPercent are recalculated server-side on
     // every GET /auth/me (see AuthService.getProfile), so refresh once here
     // to pick up tier changes from a payment made elsewhere in the app.
@@ -82,16 +98,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthController>().user;
+    final tiers = _tiers;
     final currentTierIndex = user == null
         ? 0
-        : kLoyaltyTiers.indexWhere((t) => t.key == user.userLevel.toUpperCase());
-    final currentTier = kLoyaltyTiers[currentTierIndex < 0 ? 0 : currentTierIndex];
+        : tiers.indexWhere((t) => t.key == user.userLevel.toUpperCase());
+    final currentTier = tiers[currentTierIndex < 0 ? 0 : currentTierIndex];
     final tierDetails = user?.tierDetails;
     final nextTierName = tierDetails?.nextTier != null
-        ? kLoyaltyTiers.firstWhere(
-            (t) => t.key == tierDetails!.nextTier,
-            orElse: () => currentTier,
-          ).name
+        ? tierDetails!.nextTierLabel ??
+            tiers.firstWhere((t) => t.key == tierDetails.nextTier, orElse: () => currentTier).name
         : null;
     final progress = (tierDetails?.progressPercent ?? 0) / 100;
 
@@ -261,9 +276,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 12),
-                for (int i = 0; i < kLoyaltyTiers.length; i++) ...[
-                  _TierRow(tier: kLoyaltyTiers[i], isCurrent: i == currentTierIndex),
-                  if (i != kLoyaltyTiers.length - 1) const Divider(height: 22, color: AppColors.border),
+                for (int i = 0; i < tiers.length; i++) ...[
+                  _TierRow(tier: tiers[i], isCurrent: i == currentTierIndex),
+                  if (i != tiers.length - 1) const Divider(height: 22, color: AppColors.border),
                 ],
               ],
             ),

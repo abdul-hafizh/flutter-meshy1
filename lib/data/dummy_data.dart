@@ -86,10 +86,10 @@ const List<Order> kOrders = [
   ),
 ];
 
-/// Mirrors the backend's `userTierHelper.calculateTier()` thresholds
-/// (`E:\Proyek\api-meshy\src\utils\userTierHelper.js`) — [key] matches the
-/// `UserLevel` string the API returns, so the profile screen can look up
-/// the current tier by exact match instead of guessing from a display name.
+/// A loyalty tier as set in the admin's Master Tier (`GET /user-tiers`) —
+/// [key] is the fixed code (matches the `UserLevel` the API returns); the
+/// icon and colour come from that code. [kLoyaltyTiers] is the fallback when
+/// the list can't be loaded.
 class LoyaltyTier {
   final String key;
   final String name;
@@ -106,6 +106,42 @@ class LoyaltyTier {
     required this.icon,
     required this.color,
   });
+
+  factory LoyaltyTier.fromMaster({
+    required String code,
+    required String label,
+    required num minSpent,
+    required num? nextMinSpent,
+    required num discountPercent,
+  }) {
+    final key = code.toUpperCase();
+    final style = kLoyaltyTiers.firstWhere((t) => t.key == key, orElse: () => kLoyaltyTiers.first);
+    final range = nextMinSpent != null
+        ? '${shortRupiah(minSpent)} – < ${shortRupiah(nextMinSpent)}'
+        : '≥ ${shortRupiah(minSpent)}';
+    final pct = discountPercent % 1 == 0 ? discountPercent.toInt().toString() : discountPercent.toString().replaceAll('.', ',');
+    return LoyaltyTier(
+      key: key,
+      name: label.isNotEmpty ? label : style.name,
+      range: range,
+      discountLabel: discountPercent > 0 ? '-$pct%' : 'Standard',
+      icon: style.icon,
+      color: style.color,
+    );
+  }
+}
+
+/// "Rp 500rb", "Rp 1jt", "Rp 2,5jt" — compact amounts for the tier list.
+String shortRupiah(num v) {
+  String trim(double x) {
+    final s = x.toStringAsFixed(1);
+    return (s.endsWith('.0') ? s.substring(0, s.length - 2) : s).replaceAll('.', ',');
+  }
+
+  if (v >= 1000000000) return 'Rp ${trim(v / 1000000000)}M';
+  if (v >= 1000000) return 'Rp ${trim(v / 1000000)}jt';
+  if (v >= 1000) return 'Rp ${trim(v / 1000)}rb';
+  return 'Rp ${v.round()}';
 }
 
 const List<LoyaltyTier> kLoyaltyTiers = [

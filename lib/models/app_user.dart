@@ -4,6 +4,10 @@ import '../services/api_config.dart';
 /// `GET /auth/me` — mirrors the backend's `userTierHelper.calculateTier()`.
 class TierDetails {
   final String level;
+
+  /// The admin's label for [level] / [nextTier] (Master Tier).
+  final String? levelLabel;
+  final String? nextTierLabel;
   final int discountPercent;
   final String? nextTier;
   final num? nextThreshold;
@@ -12,6 +16,8 @@ class TierDetails {
 
   const TierDetails({
     required this.level,
+    this.levelLabel,
+    this.nextTierLabel,
     required this.discountPercent,
     this.nextTier,
     this.nextThreshold,
@@ -22,6 +28,8 @@ class TierDetails {
   factory TierDetails.fromJson(Map<String, dynamic> json) {
     return TierDetails(
       level: json['level']?.toString() ?? 'BRONZE',
+      levelLabel: json['levelLabel']?.toString(),
+      nextTierLabel: json['nextTierLabel']?.toString(),
       discountPercent: json['discountPercent'] is int
           ? json['discountPercent'] as int
           : int.tryParse('${json['discountPercent']}') ?? 0,
