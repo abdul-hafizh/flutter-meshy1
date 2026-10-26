@@ -74,14 +74,14 @@ class _CartCheckoutScreenState extends State<CartCheckoutScreen> {
   _StoreShipping _shipFor(CartCheckoutGroup g) => _shipping.putIfAbsent(g.merchantId, () => _StoreShipping());
 
   bool get _anyCourier => _groups.any((g) => !_shipFor(g).isPickup);
-  int get _grandTotal => _groups.fold(0, (sum, g) => sum + g.totalAmount + _shipFor(g).shippingCost);
+  int get _grandTotal => _groups.fold(0, (sum, g) => sum + g.totalAmount + _shipFor(g).shippingCost - g.promoDiscount);
 
   // A store's order holding AI designs waits for the store to confirm the
   // print weight (= the price) — it's paid later from "Pesanan".
   bool _awaitsStore(CartCheckoutGroup g) => g.items.any((i) => i.isDesign);
   bool get _anyAwaiting => _groups.any(_awaitsStore);
   int get _payNowTotal =>
-      _groups.where((g) => !_awaitsStore(g)).fold(0, (sum, g) => sum + g.totalAmount + _shipFor(g).shippingCost);
+      _groups.where((g) => !_awaitsStore(g)).fold(0, (sum, g) => sum + g.totalAmount + _shipFor(g).shippingCost - g.promoDiscount);
 
   bool get _canSubmit =>
       !_submitting &&
@@ -603,7 +603,13 @@ class _StoreCheckoutCard extends StatelessWidget {
             'Ongkos kirim',
             ship.isPickup ? 'Gratis' : (ship.rate != null ? rupiahLabel(ship.rate!.price) : '-'),
           ),
-          _priceRow('Subtotal toko', rupiahLabel(group.totalAmount + ship.shippingCost), bold: true),
+          if (group.promoDiscount > 0)
+            _priceRow(
+              group.promoTitle != null ? 'Promo: ${group.promoTitle}' : 'Promo Petope',
+              '-${rupiahLabel(group.promoDiscount)}',
+              valueColor: const Color(0xFF1FAA59),
+            ),
+          _priceRow('Subtotal toko', rupiahLabel(group.totalAmount + ship.shippingCost - group.promoDiscount), bold: true),
         ],
       ),
     );
@@ -635,6 +641,7 @@ class _GrandTotalCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = groups.fold(0, (sum, g) => sum + g.totalAmount);
     final shipping = groups.fold(0, (sum, g) => sum + shippingOf(g).shippingCost);
+    final promo = groups.fold(0, (sum, g) => sum + g.promoDiscount);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -646,6 +653,7 @@ class _GrandTotalCard extends StatelessWidget {
         children: [
           _row('Total belanja (${groups.length} toko)', rupiahLabel(items)),
           _row('Total ongkos kirim', rupiahLabel(shipping)),
+          if (promo > 0) _row('Promo Petope', '-${rupiahLabel(promo)}'),
           const Divider(height: 20, color: AppColors.border),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

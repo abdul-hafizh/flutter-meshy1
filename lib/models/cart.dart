@@ -227,6 +227,10 @@ class CartCheckoutGroup {
 
   /// Item total incl. fees and discount, before shipping.
   final int totalAmount;
+
+  /// Discount from a Petope promo this store's part would get (paid by Petope), 0 = none.
+  final int promoDiscount;
+  final String? promoTitle;
   final int? packageWeightGrams;
   final String? packageWeightSource;
   final OperatingStatus? operatingStatus;
@@ -241,6 +245,8 @@ class CartCheckoutGroup {
     required this.taxAmount,
     required this.appFeeAmount,
     required this.totalAmount,
+    this.promoDiscount = 0,
+    this.promoTitle,
     this.packageWeightGrams,
     this.packageWeightSource,
     this.operatingStatus,
@@ -248,7 +254,10 @@ class CartCheckoutGroup {
 
   factory CartCheckoutGroup.fromJson(Map<String, dynamic> json) {
     final weight = json['PackageWeight'] is Map<String, dynamic> ? json['PackageWeight'] as Map<String, dynamic> : null;
+    final promo = json['PromoDiscount'] is Map<String, dynamic> ? json['PromoDiscount'] as Map<String, dynamic> : null;
     return CartCheckoutGroup(
+      promoDiscount: promo == null ? 0 : _asInt(promo['Amount']),
+      promoTitle: promo?['Title']?.toString(),
       merchantId: json['MerchantId']?.toString() ?? '',
       storeName: json['StoreName']?.toString() ?? 'Toko',
       merchantAvatar: ApiConfig.assetUrlOrNull(json['MerchantAvatar']?.toString()),

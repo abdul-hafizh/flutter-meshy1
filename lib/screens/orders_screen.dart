@@ -684,7 +684,7 @@ class _PhysicalOrderCard extends StatelessWidget {
                       order.awaitingMerchantConfirmation && !order.isPaid
                           ? 'Menunggu konfirmasi toko'
                           : order.isPriced
-                              ? _rupiah(order.totalAmount!)
+                              ? _rupiah(order.payableItemAmount)
                               : 'Menunggu konfirmasi harga',
                       style: TextStyle(
                         fontSize: 12.5,

@@ -258,37 +258,52 @@ class _CartScreenState extends State<CartScreen> {
           : SafeArea(
               top: false,
               child: Container(
-                padding: const EdgeInsets.fromLTRB(12, 10, 16, 10),
+                padding: const EdgeInsets.fromLTRB(12, 8, 16, 12),
                 decoration: const BoxDecoration(
                   color: AppColors.surface,
                   border: Border(top: BorderSide(color: AppColors.border)),
                 ),
-                child: Row(
+                // Two tiers so the Checkout button always fits, whatever the screen width.
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Checkbox(
-                      value: allSelected,
-                      activeColor: AppColors.purple,
-                      onChanged: _availableLines.isEmpty ? null : (v) => _toggleAll(v ?? false),
-                    ),
-                    const Text('Semua', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                    const Spacer(),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                    Row(
                       children: [
-                        const Text('Total harga barang (belum termasuk PPN & ongkir)', style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
-                        Text(
-                          rupiahLabel(_selectedTotal),
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                        Checkbox(
+                          value: allSelected,
+                          activeColor: AppColors.purple,
+                          onChanged: _availableLines.isEmpty ? null : (v) => _toggleAll(v ?? false),
+                        ),
+                        const Text('Semua', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              const Text(
+                                'Total harga barang (belum termasuk PPN & ongkir)',
+                                textAlign: TextAlign.right,
+                                style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                              ),
+                              Text(
+                                rupiahLabel(_selectedTotal),
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(width: 12),
-                    SizedBox(
-                      width: 130,
-                      child: GradientButton(
-                        label: 'Checkout ($_selectedQuantity)',
-                        onPressed: _selectedLines.isEmpty ? null : _checkout,
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: GradientButton(
+                          label: 'Checkout ($_selectedQuantity)',
+                          onPressed: _selectedLines.isEmpty ? null : _checkout,
+                        ),
                       ),
                     ),
                   ],

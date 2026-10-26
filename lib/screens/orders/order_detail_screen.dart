@@ -929,6 +929,12 @@ class _ActionArea extends StatelessWidget {
                   if (discountAmount > 0) _priceRow(order.tierDiscountLabel, '-${rupiah(discountAmount)}', valueColor: const Color(0xFF1FAA59)),
                   if (taxAmount != null && taxAmount > 0) _priceRow('PPN', rupiah(taxAmount)),
                   if (appFeeAmount != null && appFeeAmount > 0) _priceRow('Biaya Layanan Aplikasi', rupiah(appFeeAmount)),
+                  if (order.promoDiscountAmount > 0)
+                    _priceRow(
+                      order.promoTitle != null ? 'Promo: ${order.promoTitle}' : 'Promo Petope',
+                      '-${rupiah(order.promoDiscountAmount)}',
+                      valueColor: const Color(0xFF1FAA59),
+                    ),
                   const Divider(height: 20, color: AppColors.border),
                 ],
                 Row(
@@ -936,7 +942,7 @@ class _ActionArea extends StatelessWidget {
                   children: [
                     const Text('Total Pesanan', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                     Text(
-                      rupiah(order.totalAmount ?? 0),
+                      rupiah(order.payableItemAmount),
                       style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                     ),
                   ],

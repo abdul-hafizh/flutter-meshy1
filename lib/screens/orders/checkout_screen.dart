@@ -320,7 +320,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget build(BuildContext context) {
     final order = widget.order;
     final itemAmount = order.totalAmount ?? 0;
-    final totalAmount = itemAmount + (_isPickup ? 0 : (_selectedRate?.price ?? 0));
+    final promoAmount = order.promoDiscountAmount;
+    final totalAmount = itemAmount + (_isPickup ? 0 : (_selectedRate?.price ?? 0)) - promoAmount;
     final subtotalAmount = order.subtotalAmount;
     final discountAmount = order.discountAmount ?? 0;
     final taxAmount = order.taxAmount;
@@ -513,6 +514,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   ? 'Gratis (Ambil di Toko)'
                                   : (_selectedRate != null ? _rupiah(_selectedRate!.price) : '-'),
                             ),
+                            if (promoAmount > 0)
+                              _priceRow(
+                                order.promoTitle != null ? 'Promo: ${order.promoTitle}' : 'Promo Petope',
+                                '-${_rupiah(promoAmount)}',
+                                valueColor: const Color(0xFF1FAA59),
+                              ),
                             const Divider(height: 20, color: AppColors.border),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,

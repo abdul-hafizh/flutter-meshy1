@@ -310,6 +310,14 @@ class PhysicalOrder {
   /// confirm receipt (admin's Selesai Otomatis); null when it won't.
   final DateTime? autoCompleteAt;
 
+  /// Discount from a Petope promo (paid by Petope): the one taken once paid,
+  /// or — before paying — what the order would get now. 0 = none.
+  final int promoDiscountAmount;
+  final String? promoTitle;
+
+  /// What the customer pays for the items: [totalAmount] minus the promo discount.
+  int get payableItemAmount => (totalAmount ?? 0) - promoDiscountAmount;
+
   const PhysicalOrder({
     required this.id,
     this.orderNumber,
@@ -332,10 +340,16 @@ class PhysicalOrder {
     this.statusHistories = const [],
     this.printFiles = const [],
     this.autoCompleteAt,
+    this.promoDiscountAmount = 0,
+    this.promoTitle,
   });
 
   factory PhysicalOrder.fromJson(Map<String, dynamic> json) {
+    final promo = json['PromoDiscount'] is Map<String, dynamic> ? json['PromoDiscount'] as Map<String, dynamic> : null;
+    int? asInt(dynamic v) => v is int ? v : (v is num ? v.round() : int.tryParse('$v'));
     return PhysicalOrder(
+      promoDiscountAmount: asInt(promo?['Amount']) ?? asInt(json['PlatformDiscountAmount']) ?? 0,
+      promoTitle: promo?['Title']?.toString(),
       id: json['Id']?.toString() ?? '',
       orderNumber: json['OrderNumber']?.toString(),
       status: json['Status'] is Map<String, dynamic> ? OrderStatusInfo.fromJson(json['Status'] as Map<String, dynamic>) : null,
