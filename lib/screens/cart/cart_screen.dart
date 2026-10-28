@@ -7,6 +7,7 @@ import '../../providers/cart_controller.dart';
 import '../../services/auth_service.dart' show ApiException;
 import '../../services/cart_service.dart';
 import '../../services/location_gate.dart';
+import '../../services/tax_config.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/store_status.dart';
 import '../../widgets/checkout/shipping_widgets.dart' show rupiahLabel;
@@ -282,12 +283,12 @@ class _CartScreenState extends State<CartScreen> {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               const Text(
-                                'Total harga barang (belum termasuk PPN & ongkir)',
+                                'Total harga barang (belum termasuk ongkir)',
                                 textAlign: TextAlign.right,
                                 style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
                               ),
                               Text(
-                                rupiahLabel(_selectedTotal),
+                                rupiahLabel(TaxConfig.withPpn(_selectedTotal)),
                                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                               ),
                             ],
@@ -523,7 +524,7 @@ class _CartLineTile extends StatelessWidget {
                   ],
                   const SizedBox(height: 2),
                   Text(
-                    rupiahLabel(line.unitPrice),
+                    rupiahLabel(TaxConfig.withPpn(line.unitPrice)),
                     style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.orangeDeep),
                   ),
                   if (line.issue != null) ...[

@@ -1,4 +1,5 @@
 import '../services/api_config.dart';
+import '../services/tax_config.dart';
 import 'operating_status.dart';
 
 int _asInt(dynamic v) => v is int ? v : (v is num ? v.round() : int.tryParse('$v') ?? 0);
@@ -213,6 +214,7 @@ class CartGroup {
 
 /// One merchant's part of a checkout, priced by the backend (tier discount,
 /// any older service fee / PPN are the server's call — never computed in the app).
+/// Shown with PPN folded into the prices — see [ppn].
 class CartCheckoutGroup {
   final String merchantId;
   final String storeName;
@@ -234,6 +236,9 @@ class CartCheckoutGroup {
   final int? packageWeightGrams;
   final String? packageWeightSource;
   final OperatingStatus? operatingStatus;
+
+  /// Subtotal, discount and item prices with this group's PPN included.
+  PpnInclusive get ppn => PpnInclusive.of(subtotal: subtotalAmount, discount: discountAmount, tax: taxAmount);
 
   const CartCheckoutGroup({
     required this.merchantId,

@@ -220,7 +220,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Tier & Diskon',
+                  'Membership & Diskon',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white),
                 ),
                 const SizedBox(height: 16),
@@ -253,7 +253,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Text(
                     nextTierName != null
                         ? '${_rupiah(tierDetails?.remainingForNextTier ?? 0)} lagi menuju $nextTierName'
-                        : 'Kamu sudah di tier tertinggi 🎉',
+                        : 'Kamu sudah di membership tertinggi 🎉',
                     style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.9)),
                   ),
                 ),
@@ -272,7 +272,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Semua Tier',
+                  'Semua Membership',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 12),
@@ -305,7 +305,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 2),
                 const Text(
-                  'Akumulasi transaksi yang sudah dibayar — menentukan tier & diskon kamu.',
+                  'Akumulasi transaksi yang sudah dibayar — menentukan membership & diskon kamu.',
                   style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
               ],

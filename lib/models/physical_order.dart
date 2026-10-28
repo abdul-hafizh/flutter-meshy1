@@ -1,5 +1,6 @@
 import 'ai_job.dart';
 import '../services/api_config.dart';
+import '../services/tax_config.dart';
 import 'operating_status.dart';
 
 /// Item categories (same as the backend's utils/itemCategory.js): a ready-made
@@ -315,8 +316,18 @@ class PhysicalOrder {
   final int promoDiscountAmount;
   final String? promoTitle;
 
-  /// What the customer pays for the items: [totalAmount] minus the promo discount.
-  int get payableItemAmount => (totalAmount ?? 0) - promoDiscountAmount;
+  /// Biaya jasa aplikasi: the one on the order, or — not paid yet and none set
+  /// so far — what paying it will add (the backend sets it on the payment).
+  int get appFeeDue => (appFeeAmount ?? 0) > 0 || isPaid || isCompleted ? (appFeeAmount ?? 0) : TaxConfig.appFee;
+
+  /// The items (incl. PPN) without the app fee, before the promo discount.
+  int get itemsAmount => (totalAmount ?? 0) - (appFeeAmount ?? 0);
+
+  /// What the customer pays for the order without shipping: items + app fee − promo discount.
+  int get payableItemAmount => itemsAmount + appFeeDue - promoDiscountAmount;
+
+  /// Subtotal and discount with the order's PPN included (PPN isn't shown on its own).
+  PpnInclusive get ppn => PpnInclusive.of(subtotal: subtotalAmount ?? 0, discount: discountAmount ?? 0, tax: taxAmount ?? 0);
 
   const PhysicalOrder({
     required this.id,
@@ -427,11 +438,11 @@ class PhysicalOrder {
   String get tierDiscountLabel {
     final discount = discountAmount ?? 0;
     final subtotal = subtotalAmount ?? 0;
-    if (discount <= 0 || subtotal <= 0) return 'Diskon Tier';
+    if (discount <= 0 || subtotal <= 0) return 'Diskon Membership';
     final percent = (discount / subtotal * 100).round();
     const names = {5: 'Silver', 10: 'Gold', 20: 'Platinum', 30: 'Solitaire'};
     final name = names[percent];
-    return name != null ? 'Diskon Tier $name ($percent%)' : 'Diskon Tier ($percent%)';
+    return name != null ? 'Diskon Membership $name ($percent%)' : 'Diskon Membership ($percent%)';
   }
 
   bool get isPaid => payments.any((p) => p.isPaid);

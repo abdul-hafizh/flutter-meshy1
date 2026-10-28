@@ -6,6 +6,7 @@ import '../providers/auth_controller.dart';
 import '../providers/cart_controller.dart';
 import '../services/auth_service.dart' show ApiException;
 import '../services/cart_service.dart';
+import '../services/tax_config.dart';
 import '../theme/app_theme.dart';
 import 'checkout/shipping_widgets.dart' show rupiahLabel;
 import 'gradient_button.dart';
@@ -216,14 +217,14 @@ class _DesignCartSheetState extends State<_DesignCartSheet> {
                           const Text('Total', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
                           const Spacer(),
                           Text(
-                            rupiahLabel((material?.unitPrice ?? 0) * _quantity),
+                            rupiahLabel(TaxConfig.withPpn((material?.unitPrice ?? 0) * _quantity)),
                             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.orangeDeep),
                           ),
                         ],
                       ),
                       const SizedBox(height: 4),
                       const Text(
-                        'Belum termasuk PPN & ongkir (dihitung saat checkout).',
+                        'Belum termasuk ongkir (dihitung saat checkout).',
                         style: TextStyle(fontSize: 11.5, color: AppColors.textFaint),
                       ),
                       const SizedBox(height: 16),
@@ -279,7 +280,7 @@ class _MaterialTile extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  rupiahLabel(option.unitPrice),
+                  rupiahLabel(TaxConfig.withPpn(option.unitPrice)),
                   style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.orangeDeep),
                 ),
               ],

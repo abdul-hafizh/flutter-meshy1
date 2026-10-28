@@ -909,8 +909,8 @@ class _ActionArea extends StatelessWidget {
     if (!order.isPaid && !order.isCompleted) {
       final subtotalAmount = order.subtotalAmount;
       final discountAmount = order.discountAmount ?? 0;
-      final taxAmount = order.taxAmount;
-      final appFeeAmount = order.appFeeAmount;
+      final ppn = order.ppn;
+      final appFee = order.appFeeDue;
       final hasBreakdown = subtotalAmount != null;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -925,10 +925,9 @@ class _ActionArea extends StatelessWidget {
             child: Column(
               children: [
                 if (hasBreakdown) ...[
-                  _priceRow('Harga Barang', rupiah(subtotalAmount)),
-                  if (discountAmount > 0) _priceRow(order.tierDiscountLabel, '-${rupiah(discountAmount)}', valueColor: const Color(0xFF1FAA59)),
-                  if (taxAmount != null && taxAmount > 0) _priceRow('PPN', rupiah(taxAmount)),
-                  if (appFeeAmount != null && appFeeAmount > 0) _priceRow('Biaya Layanan Aplikasi', rupiah(appFeeAmount)),
+                  _priceRow('Harga Barang', rupiah(ppn.subtotal)),
+                  if (discountAmount > 0) _priceRow(order.tierDiscountLabel, '-${rupiah(ppn.discount)}', valueColor: const Color(0xFF1FAA59)),
+                  if (appFee > 0) _priceRow('Biaya Jasa Aplikasi', rupiah(appFee)),
                   if (order.promoDiscountAmount > 0)
                     _priceRow(
                       order.promoTitle != null ? 'Promo: ${order.promoTitle}' : 'Promo Petope',

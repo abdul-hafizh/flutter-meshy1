@@ -8,6 +8,7 @@ import '../../screens/product_detail_screen.dart';
 import '../../services/api_config.dart';
 import '../../services/auth_service.dart' show ApiException;
 import '../../services/product_service.dart';
+import '../../services/tax_config.dart';
 import '../../theme/app_theme.dart';
 
 String _rupiah(int v) {
@@ -87,7 +88,7 @@ class _ProductLinkCardState extends State<_ProductLinkCard> {
     final name = extraData['productName']?.toString() ?? 'Produk';
     final thumbnailPath = extraData['thumbnailPath']?.toString();
     final price = extraData['price'];
-    final priceLabel = price is num ? _rupiah(price.toInt()) : null;
+    final priceLabel = price is num ? _rupiah(TaxConfig.withPpn(price.toInt())) : null;
 
     return Material(
       color: Colors.transparent,

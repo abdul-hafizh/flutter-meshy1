@@ -16,6 +16,7 @@ import '../../services/payment_method_service.dart';
 import '../../services/shipping_rate_service.dart';
 import '../../services/user_address_service.dart';
 import '../../services/location_gate.dart';
+import '../../services/tax_config.dart';
 import '../../providers/active_address_controller.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/store_status.dart';
@@ -74,14 +75,17 @@ class _CartCheckoutScreenState extends State<CartCheckoutScreen> {
   _StoreShipping _shipFor(CartCheckoutGroup g) => _shipping.putIfAbsent(g.merchantId, () => _StoreShipping());
 
   bool get _anyCourier => _groups.any((g) => !_shipFor(g).isPickup);
-  int get _grandTotal => _groups.fold(0, (sum, g) => sum + g.totalAmount + _shipFor(g).shippingCost - g.promoDiscount);
 
   // A store's order holding AI designs waits for the store to confirm the
   // print weight (= the price) — it's paid later from "Pesanan".
   bool _awaitsStore(CartCheckoutGroup g) => g.items.any((i) => i.isDesign);
   bool get _anyAwaiting => _groups.any(_awaitsStore);
-  int get _payNowTotal =>
-      _groups.where((g) => !_awaitsStore(g)).fold(0, (sum, g) => sum + g.totalAmount + _shipFor(g).shippingCost - g.promoDiscount);
+  // Biaya jasa aplikasi — once for this payment; an order awaiting its store
+  // pays its own when it's paid later.
+  int get _appFee => _groups.any((g) => !_awaitsStore(g)) ? TaxConfig.appFee : 0;
+  int _groupDue(CartCheckoutGroup g) => g.totalAmount + _shipFor(g).shippingCost - g.promoDiscount;
+  int get _grandTotal => _groups.fold(0, (sum, g) => sum + _groupDue(g)) + _appFee;
+  int get _payNowTotal => _groups.where((g) => !_awaitsStore(g)).fold(0, (sum, g) => sum + _groupDue(g)) + _appFee;
 
   bool get _canSubmit =>
       !_submitting &&
@@ -94,6 +98,10 @@ class _CartCheckoutScreenState extends State<CartCheckoutScreen> {
   void initState() {
     super.initState();
     _load();
+    // The biaya jasa aplikasi shown must be the admin's current one.
+    TaxConfig.refresh(force: true).then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -381,7 +389,7 @@ class _CartCheckoutScreenState extends State<CartCheckoutScreen> {
                           onChanged: (v) => setState(() => _paymentMethodId = v),
                         ),
                       const SizedBox(height: 18),
-                      _GrandTotalCard(groups: _groups, shippingOf: (g) => _shipFor(g), total: _grandTotal),
+                      _GrandTotalCard(groups: _groups, shippingOf: (g) => _shipFor(g), appFee: _appFee, total: _grandTotal),
                       if (_submitError != null) ...[
                         const SizedBox(height: 12),
                         Container(
@@ -456,6 +464,7 @@ class _StoreCheckoutCard extends StatelessWidget {
       destinationHasCoordinates: ship.destinationHasCoordinates,
       originHasCoordinates: ship.originHasCoordinates,
     );
+    final ppn = group.ppn;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -505,7 +514,7 @@ class _StoreCheckoutCard extends StatelessWidget {
                       style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
                     ),
                   ),
-                  Text(rupiahLabel(line.lineTotal), style: const TextStyle(fontSize: 12.5, color: AppColors.textPrimary)),
+                  Text(rupiahLabel(ppn.price(line.lineTotal)), style: const TextStyle(fontSize: 12.5, color: AppColors.textPrimary)),
                 ],
               ),
             ),
@@ -594,11 +603,9 @@ class _StoreCheckoutCard extends StatelessWidget {
             style: const TextStyle(fontSize: 13),
           ),
           const Divider(height: 22, color: AppColors.border),
-          _priceRow('Harga barang', rupiahLabel(group.subtotalAmount)),
+          _priceRow('Harga barang', rupiahLabel(ppn.subtotal)),
           if (group.discountAmount > 0)
-            _priceRow('Diskon tier', '-${rupiahLabel(group.discountAmount)}', valueColor: const Color(0xFF1FAA59)),
-          if (group.appFeeAmount > 0) _priceRow('Biaya layanan aplikasi', rupiahLabel(group.appFeeAmount)),
-          if (group.taxAmount > 0) _priceRow('PPN', rupiahLabel(group.taxAmount)),
+            _priceRow('Diskon membership', '-${rupiahLabel(ppn.discount)}', valueColor: const Color(0xFF1FAA59)),
           _priceRow(
             'Ongkos kirim',
             ship.isPickup ? 'Gratis' : (ship.rate != null ? rupiahLabel(ship.rate!.price) : '-'),
@@ -633,9 +640,10 @@ class _StoreCheckoutCard extends StatelessWidget {
 class _GrandTotalCard extends StatelessWidget {
   final List<CartCheckoutGroup> groups;
   final _StoreShipping Function(CartCheckoutGroup) shippingOf;
+  final int appFee;
   final int total;
 
-  const _GrandTotalCard({required this.groups, required this.shippingOf, required this.total});
+  const _GrandTotalCard({required this.groups, required this.shippingOf, required this.appFee, required this.total});
 
   @override
   Widget build(BuildContext context) {
@@ -653,6 +661,7 @@ class _GrandTotalCard extends StatelessWidget {
         children: [
           _row('Total belanja (${groups.length} toko)', rupiahLabel(items)),
           _row('Total ongkos kirim', rupiahLabel(shipping)),
+          if (appFee > 0) _row('Biaya jasa aplikasi', rupiahLabel(appFee)),
           if (promo > 0) _row('Promo Petope', '-${rupiahLabel(promo)}'),
           const Divider(height: 20, color: AppColors.border),
           Row(

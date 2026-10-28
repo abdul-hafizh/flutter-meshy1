@@ -16,6 +16,7 @@ import '../../services/payment_method_service.dart';
 import '../../services/shipping_rate_service.dart';
 import '../../services/user_address_service.dart';
 import '../../services/location_gate.dart';
+import '../../services/tax_config.dart';
 import '../../providers/active_address_controller.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/store_status.dart';
@@ -74,6 +75,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   void initState() {
     super.initState();
     _load();
+    // The biaya jasa aplikasi shown must be the admin's current one.
+    TaxConfig.refresh(force: true).then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   String? get _token => context.read<AuthController>().token;
@@ -319,13 +324,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final order = widget.order;
-    final itemAmount = order.totalAmount ?? 0;
+    final itemAmount = order.itemsAmount;
     final promoAmount = order.promoDiscountAmount;
-    final totalAmount = itemAmount + (_isPickup ? 0 : (_selectedRate?.price ?? 0)) - promoAmount;
+    final totalAmount = order.payableItemAmount + (_isPickup ? 0 : (_selectedRate?.price ?? 0));
     final subtotalAmount = order.subtotalAmount;
     final discountAmount = order.discountAmount ?? 0;
-    final taxAmount = order.taxAmount;
-    final appFeeAmount = order.appFeeAmount;
+    final ppn = order.ppn;
+    final appFee = order.appFeeDue;
     final hasBreakdown = subtotalAmount != null;
 
     return Scaffold(
@@ -502,12 +507,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         child: Column(
                           children: [
                             if (hasBreakdown) ...[
-                              _priceRow('Harga Barang', _rupiah(subtotalAmount)),
-                              if (discountAmount > 0) _priceRow(order.tierDiscountLabel, '-${_rupiah(discountAmount)}', valueColor: const Color(0xFF1FAA59)),
-                              if (taxAmount != null && taxAmount > 0) _priceRow('PPN', _rupiah(taxAmount)),
-                              if (appFeeAmount != null && appFeeAmount > 0) _priceRow('Biaya Layanan Aplikasi', _rupiah(appFeeAmount)),
+                              _priceRow('Harga Barang', _rupiah(ppn.subtotal)),
+                              if (discountAmount > 0) _priceRow(order.tierDiscountLabel, '-${_rupiah(ppn.discount)}', valueColor: const Color(0xFF1FAA59)),
                             ] else
                               _priceRow('Harga Barang', _rupiah(itemAmount)),
+                            if (appFee > 0) _priceRow('Biaya Jasa Aplikasi', _rupiah(appFee)),
                             _priceRow(
                               'Ongkos Kirim',
                               _isPickup

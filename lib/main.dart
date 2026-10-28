@@ -7,6 +7,7 @@ import 'providers/cart_controller.dart';
 import 'providers/chat_controller.dart';
 import 'screens/auth/auth_gate.dart';
 import 'services/api_config.dart';
+import 'services/tax_config.dart';
 import 'theme/app_theme.dart';
 import 'widgets/location_required_gate.dart';
 import 'widgets/update_gate.dart';
@@ -16,6 +17,8 @@ void main() async {
   // Loads the last known-good API origin from disk, then kicks off a
   // background refresh — never blocks startup on the network.
   await ApiConfig.init();
+  // Prices are shown with PPN included — last known rate, refreshed in the background.
+  await TaxConfig.init();
   runApp(const SnapyApp());
 }
 

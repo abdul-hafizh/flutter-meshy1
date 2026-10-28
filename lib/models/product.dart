@@ -1,5 +1,6 @@
 import '../utils/sold_format.dart';
 import '../services/api_config.dart';
+import '../services/tax_config.dart';
 import 'operating_status.dart';
 
 /// A ready-made product a merchant sells directly (already priced, with
@@ -84,8 +85,9 @@ class Product {
     return soldUnits > 0 ? '$soldUnits terjual' : null;
   }
 
+  /// The price with PPN included — what the customer sees.
   String get priceLabel {
-    final s = price.toString();
+    final s = TaxConfig.withPpn(price).toString();
     final buf = StringBuffer();
     for (int i = 0; i < s.length; i++) {
       final posFromEnd = s.length - i;
