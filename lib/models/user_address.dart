@@ -12,9 +12,13 @@ class UserAddress {
   final int? countryId;
   final int? provinceId;
   final int? cityId;
+  final int? districtId;
+  final int? villageId;
   final CountryRef? country;
   final ProvinceRef? province;
   final CityRef? city;
+  final DistrictRef? district;
+  final VillageRef? village;
   final String? postalCode;
   final double? latitude;
   final double? longitude;
@@ -30,9 +34,13 @@ class UserAddress {
     this.countryId,
     this.provinceId,
     this.cityId,
+    this.districtId,
+    this.villageId,
     this.country,
     this.province,
     this.city,
+    this.district,
+    this.village,
     this.postalCode,
     this.latitude,
     this.longitude,
@@ -50,9 +58,13 @@ class UserAddress {
       countryId: json['CountryId'] is int ? json['CountryId'] as int : int.tryParse('${json['CountryId']}'),
       provinceId: json['ProvinceId'] is int ? json['ProvinceId'] as int : int.tryParse('${json['ProvinceId']}'),
       cityId: json['CityId'] is int ? json['CityId'] as int : int.tryParse('${json['CityId']}'),
+      districtId: json['DistrictId'] is int ? json['DistrictId'] as int : int.tryParse('${json['DistrictId']}'),
+      villageId: json['VillageId'] is int ? json['VillageId'] as int : int.tryParse('${json['VillageId']}'),
       country: json['Country'] is Map<String, dynamic> ? CountryRef.fromJson(json['Country'] as Map<String, dynamic>) : null,
       province: json['Province'] is Map<String, dynamic> ? ProvinceRef.fromJson(json['Province'] as Map<String, dynamic>) : null,
       city: json['City'] is Map<String, dynamic> ? CityRef.fromJson(json['City'] as Map<String, dynamic>) : null,
+      district: json['District'] is Map<String, dynamic> ? DistrictRef.fromJson(json['District'] as Map<String, dynamic>) : null,
+      village: json['Village'] is Map<String, dynamic> ? VillageRef.fromJson(json['Village'] as Map<String, dynamic>) : null,
       postalCode: json['PostalCode']?.toString(),
       latitude: double.tryParse('${json['Latitude']}'),
       longitude: double.tryParse('${json['Longitude']}'),
@@ -64,6 +76,8 @@ class UserAddress {
   String get summaryLine {
     final parts = [
       if (address != null && address!.isNotEmpty) address,
+      if (village != null) 'Kel. ${village!.name}',
+      if (district != null) 'Kec. ${district!.name}',
       if (city != null) city!.name,
       if (province != null) province!.name,
       if (postalCode != null && postalCode!.isNotEmpty) postalCode,

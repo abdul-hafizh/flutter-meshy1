@@ -10,6 +10,7 @@ import '../widgets/cart_icon_button.dart';
 import '../widgets/home/delivery_address_bar.dart';
 import '../widgets/home/nearby_stores_section.dart';
 import '../widgets/home/promo_popup.dart';
+import '../widgets/home/start_options.dart';
 import '../widgets/product_card.dart';
 import '../widgets/section_header.dart';
 import '../widgets/token_balance_badge.dart';
@@ -150,7 +151,8 @@ class HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 16),
           const DeliveryAddressBar(),
           const SizedBox(height: 18),
-          _CreatePromptCard(onTap: widget.onCreateTap),
+          // Three ways to order: market, AI prompt, or a ready-to-print file via a store's chat.
+          StartOptions(onReadyMade: widget.onSeeAllTap, onPrompt: widget.onCreateTap),
           const SizedBox(height: 26),
           const NearbyStoresSection(),
           const SizedBox(height: 26),
@@ -200,88 +202,3 @@ class HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _CreatePromptCard extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _CreatePromptCard({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: AppColors.brandGradient,
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadowFor(AppColors.purple),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Apa yang mau kamu ciptakan?',
-            style: TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              height: 1.25,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Ketik ide kamu, AI yang wujudkan jadi 3D',
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.white.withValues(alpha: 0.85),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Material(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: onTap,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 6, 4),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Contoh: Miniatur mobil sport warna merah.',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: AppColors.textFaint,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: const BoxDecoration(
-                        gradient: AppColors.brandGradient,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.arrow_forward_rounded,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

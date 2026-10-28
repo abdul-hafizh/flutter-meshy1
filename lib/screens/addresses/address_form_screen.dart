@@ -40,9 +40,14 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
   List<CountryRef> _countries = [];
   List<ProvinceRef> _provinces = [];
   List<CityRef> _cities = [];
+  // Kecamatan / kelurahan — Indonesia only (empty lists elsewhere hide the pickers).
+  List<DistrictRef> _districts = [];
+  List<VillageRef> _villages = [];
   int? _countryId;
   int? _provinceId;
   int? _cityId;
+  int? _districtId;
+  int? _villageId;
 
   bool _loadingRegions = true;
   bool _submitting = false;
@@ -64,6 +69,8 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     _countryId = existing?.countryId;
     _provinceId = existing?.provinceId;
     _cityId = existing?.cityId;
+    _districtId = existing?.districtId;
+    _villageId = existing?.villageId;
     _loadRegions();
   }
 
@@ -88,17 +95,27 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
       final countries = await LocationService.listCountries(token: token);
       List<ProvinceRef> provinces = [];
       List<CityRef> cities = [];
+      List<DistrictRef> districts = [];
+      List<VillageRef> villages = [];
       if (_countryId != null) {
         provinces = await LocationService.listProvinces(token: token, countryId: _countryId);
       }
       if (_provinceId != null) {
         cities = await LocationService.listCities(token: token, provinceId: _provinceId);
       }
+      if (_cityId != null) {
+        districts = await LocationService.listDistricts(token: token, cityId: _cityId!);
+      }
+      if (_districtId != null) {
+        villages = await LocationService.listVillages(token: token, districtId: _districtId!);
+      }
       if (!mounted) return;
       setState(() {
         _countries = countries;
         _provinces = provinces;
         _cities = cities;
+        _districts = districts;
+        _villages = villages;
       });
     } catch (_) {
       // Best-effort — the free-text Address field still works without region pickers.
@@ -111,9 +128,8 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     setState(() {
       _countryId = countryId;
       _provinceId = null;
-      _cityId = null;
       _provinces = [];
-      _cities = [];
+      _clearCity();
     });
     final token = _token;
     if (token == null || countryId == null) return;
@@ -129,8 +145,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
   Future<void> _onProvinceChanged(int? provinceId) async {
     setState(() {
       _provinceId = provinceId;
-      _cityId = null;
-      _cities = [];
+      _clearCity();
     });
     final token = _token;
     if (token == null || provinceId == null) return;
@@ -141,6 +156,61 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     } catch (_) {
       // Best-effort.
     }
+  }
+
+  /// Forgets the city and everything below it.
+  void _clearCity() {
+    _cityId = null;
+    _cities = [];
+    _districtId = null;
+    _districts = [];
+    _villageId = null;
+    _villages = [];
+  }
+
+  Future<void> _onCityChanged(int? cityId) async {
+    setState(() {
+      _cityId = cityId;
+      _districtId = null;
+      _districts = [];
+      _villageId = null;
+      _villages = [];
+    });
+    final token = _token;
+    if (token == null || cityId == null) return;
+    try {
+      final districts = await LocationService.listDistricts(token: token, cityId: cityId);
+      if (!mounted || _cityId != cityId) return;
+      setState(() => _districts = districts);
+    } catch (_) {
+      // Best-effort — kecamatan is optional.
+    }
+  }
+
+  Future<void> _onDistrictChanged(int? districtId) async {
+    setState(() {
+      _districtId = districtId;
+      _villageId = null;
+      _villages = [];
+    });
+    final token = _token;
+    if (token == null || districtId == null) return;
+    try {
+      final villages = await LocationService.listVillages(token: token, districtId: districtId);
+      if (!mounted || _districtId != districtId) return;
+      setState(() => _villages = villages);
+    } catch (_) {
+      // Best-effort — kelurahan is optional.
+    }
+  }
+
+  /// Picking a kelurahan fills in its kode pos.
+  void _onVillageChanged(int? villageId) {
+    final postal = _villages.where((v) => v.id == villageId).firstOrNull?.postalCode;
+    setState(() {
+      _villageId = villageId;
+      if (postal != null) _postalCodeCtrl.text = postal;
+    });
   }
 
   Future<void> _useCurrentLocation() async {
@@ -262,6 +332,20 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
             : await LocationService.listCities(token: token, provinceId: provinceId);
         cityId = RegionMatcher.city(cities, [place.subAdministrativeArea, place.locality]);
       }
+      // The geocoder usually puts the kecamatan in locality and the kelurahan in subLocality.
+      var districts = <DistrictRef>[];
+      var villages = <VillageRef>[];
+      int? districtId;
+      int? villageId;
+      if (cityId != null) {
+        districts = await LocationService.listDistricts(token: token, cityId: cityId);
+        districtId = RegionMatcher.subArea(districts, (d) => d.id, (d) => d.name, [place.locality, place.subLocality]);
+      }
+      if (districtId != null) {
+        villages = await LocationService.listVillages(token: token, districtId: districtId);
+        villageId = RegionMatcher.subArea(villages, (v) => v.id, (v) => v.name, [place.subLocality, place.name]);
+      }
+      final villagePostal = villages.where((v) => v.id == villageId).firstOrNull?.postalCode;
       if (!mounted) return filledAny;
       setState(() {
         _countryId = countryId;
@@ -269,6 +353,11 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
         _provinceId = provinceId;
         _cities = cities;
         _cityId = cityId;
+        _districts = districts;
+        _districtId = districtId;
+        _villages = villages;
+        _villageId = villageId;
+        if (villagePostal != null) _postalCodeCtrl.text = villagePostal;
       });
       return true;
     } catch (_) {
@@ -321,6 +410,9 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
           countryId: _countryId,
           provinceId: _provinceId,
           cityId: _cityId,
+          districtId: _districtId,
+          villageId: _villageId,
+          withRegion: true,
           postalCode: _postalCodeCtrl.text.trim(),
           latitude: _latitude,
           longitude: _longitude,
@@ -338,6 +430,9 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
           countryId: _countryId,
           provinceId: _provinceId,
           cityId: _cityId,
+          districtId: _districtId,
+          villageId: _villageId,
+          withRegion: true,
           postalCode: _postalCodeCtrl.text.trim(),
           latitude: _latitude,
           longitude: _longitude,
@@ -447,14 +542,40 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                   items: [
                     for (final c in _cities) DropdownMenuItem(value: c.id, child: Text(c.name)),
                   ],
-                  onChanged: _provinceId == null ? null : (v) => setState(() => _cityId = v),
+                  onChanged: _provinceId == null ? null : _onCityChanged,
                 ),
+                if (_districts.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    key: ValueKey('district-$_cityId-$_districtId'),
+                    initialValue: _districts.any((d) => d.id == _districtId) ? _districtId : null,
+                    isExpanded: true,
+                    decoration: _decoration('Kecamatan'),
+                    items: [
+                      for (final d in _districts) DropdownMenuItem(value: d.id, child: Text(d.name)),
+                    ],
+                    onChanged: _onDistrictChanged,
+                  ),
+                ],
+                if (_villages.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    key: ValueKey('village-$_districtId-$_villageId'),
+                    initialValue: _villages.any((v) => v.id == _villageId) ? _villageId : null,
+                    isExpanded: true,
+                    decoration: _decoration('Kelurahan / Desa'),
+                    items: [
+                      for (final v in _villages) DropdownMenuItem(value: v.id, child: Text(v.name)),
+                    ],
+                    onChanged: _onVillageChanged,
+                  ),
+                ],
               ],
               const SizedBox(height: 12),
               TextFormField(
                 controller: _postalCodeCtrl,
                 keyboardType: TextInputType.number,
-                decoration: _decoration('Kode pos (opsional)'),
+                decoration: _decoration('Kode pos (opsional)', hint: 'Terisi otomatis dari kelurahan'),
               ),
               const SizedBox(height: 12),
               const Text(

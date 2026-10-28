@@ -95,6 +95,22 @@ class RegionMatcher {
     return null;
   }
 
+  static const _subAreaWords = {'kecamatan', 'kec', 'kelurahan', 'kel', 'desa', 'district', 'subdistrict', 'village'};
+
+  /// A kecamatan or kelurahan/desa by name: the first candidate that matches
+  /// exactly one option ("Kecamatan Sukajadi", "Kel. Cipedes" … — the kind
+  /// word is ignored).
+  static int? subArea<T>(List<T> options, int Function(T) id, String Function(T) name, List<String?> candidates) {
+    Set<String> words(String raw) => _words(raw)..removeAll(_subAreaWords);
+    for (final raw in candidates) {
+      if (raw == null || raw.trim().isEmpty) continue;
+      final wanted = words(raw);
+      final hits = [for (final o in options) if (_sameWords(wanted, words(name(o)))) o];
+      if (hits.length == 1) return id(hits.first);
+    }
+    return null;
+  }
+
   /// ('kota' | 'kabupaten' | null, remaining words)
   static (String?, Set<String>) _cityParts(String name) {
     final words = _words(name);

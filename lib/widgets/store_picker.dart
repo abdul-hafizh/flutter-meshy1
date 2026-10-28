@@ -11,13 +11,17 @@ import 'store_status.dart';
 
 enum _StoreSort { nearest, rating, sold }
 
-/// Full-screen store chooser for the prompt screen — city, rating and total
-/// grams sold per store, like an online marketplace. Pops the chosen
-/// [NearbyMerchant].
+/// Full-screen store chooser (the prompt screen, and "Produk Siap Print" on
+/// the home screen) — city, distance, rating and total grams sold per store,
+/// like an online marketplace. Pops the chosen [NearbyMerchant].
 class StorePickerScreen extends StatefulWidget {
   final String? selectedId;
+  final String title;
 
-  const StorePickerScreen({super.key, this.selectedId});
+  /// Shown above the list — what picking a store leads to.
+  final String? subtitle;
+
+  const StorePickerScreen({super.key, this.selectedId, this.title = 'Pilih Toko', this.subtitle});
 
   @override
   State<StorePickerScreen> createState() => _StorePickerScreenState();
@@ -88,12 +92,17 @@ class _StorePickerScreenState extends State<StorePickerScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Pilih Toko'),
+        title: Text(widget.title),
         backgroundColor: AppColors.background,
         surfaceTintColor: Colors.transparent,
       ),
       body: Column(
         children: [
+          if (widget.subtitle != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(widget.subtitle!, style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
             child: TextField(

@@ -4,16 +4,14 @@ import 'package:provider/provider.dart';
 import '../models/nearby_merchant.dart';
 import '../models/product.dart';
 import '../providers/auth_controller.dart';
-import '../providers/chat_controller.dart';
 import '../services/auth_service.dart' show ApiException;
-import '../services/chat_service.dart';
 import '../services/product_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/cart_icon_button.dart';
 import '../widgets/product_card.dart';
 import '../widgets/store_picker.dart' show StoreSummaryTile;
 import '../widgets/store_status.dart';
-import 'chat/chat_screen.dart';
+import 'chat/open_store_chat.dart';
 import 'product_detail_screen.dart';
 
 /// One store: its card (photo, city, rating, grams sold, hours), a chat
@@ -111,22 +109,9 @@ class _StoreScreenState extends State<StoreScreen> {
   }
 
   Future<void> _chat() async {
-    final token = context.read<AuthController>().token;
-    if (token == null) return;
     setState(() => _openingChat = true);
-    try {
-      final client = await context.read<ChatController>().ensureConnected(token);
-      final info = await ChatService.createOrGetChannel(token: token, merchantId: widget.store.id);
-      final channel = client.channel(info.channelType, id: info.channelId);
-      if (!mounted) return;
-      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => ChatScreen(client: client, channel: channel)));
-    } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-    } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal membuka chat.')));
-    } finally {
-      if (mounted) setState(() => _openingChat = false);
-    }
+    await openStoreChat(context, widget.store.id);
+    if (mounted) setState(() => _openingChat = false);
   }
 
   @override

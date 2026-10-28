@@ -4,7 +4,7 @@ import '../models/region.dart';
 import 'api_client.dart';
 import 'api_config.dart';
 
-/// Country/Province/City lookups for cascading address dropdowns.
+/// Country/Province/City/Kecamatan/Kelurahan lookups for cascading address dropdowns.
 class LocationService {
   LocationService._();
 
@@ -51,5 +51,27 @@ class LocationService {
     final decoded = decodeApiResponse(res);
     final list = decoded['data'] as List<dynamic>? ?? [];
     return list.map((e) => CityRef.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Kecamatan of a kota/kabupaten (empty outside Indonesia).
+  static Future<List<DistrictRef>> listDistricts({required String token, required int cityId}) async {
+    final list = await _getList('/districts?cityId=$cityId&limit=500', token);
+    return list.map((e) => DistrictRef.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Kelurahan/desa of a kecamatan, each with its kode pos.
+  static Future<List<VillageRef>> listVillages({required String token, required int districtId}) async {
+    final list = await _getList('/villages?districtId=$districtId&limit=500', token);
+    return list.map((e) => VillageRef.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  static Future<List<dynamic>> _getList(String path, String token) async {
+    http.Response res;
+    try {
+      res = await http.get(_uri(path), headers: _headers(token)).timeout(const Duration(seconds: 20));
+    } catch (_) {
+      throw ApiException('Tidak dapat terhubung ke server. Periksa koneksi kamu.');
+    }
+    return decodeApiResponse(res)['data'] as List<dynamic>? ?? [];
   }
 }
