@@ -44,7 +44,7 @@ class _CreateScreenState extends State<CreateScreen> {
   final TextEditingController _lengthController = TextEditingController();
   final TextEditingController _widthController = TextEditingController();
   final TextEditingController _heightController = TextEditingController();
-  /// The customer's optional wish — SINGLE (satu warna) or MULTI; the store decides in the end.
+  /// Required: SINGLE (satu warna, STL file) or MULTI (multicolor, 3MF file).
   String? _colorType;
   _CreateMode _mode = _CreateMode.text;
   bool _hasText = false;
@@ -52,6 +52,9 @@ class _CreateScreenState extends State<CreateScreen> {
 
   /// Set after a Generate tap with a missing size, so the empty fields turn red.
   bool _showDimErrors = false;
+
+  /// Set after a Generate tap with no colour type, so the section turns red.
+  bool _showColorError = false;
 
   /// The store that will print the design — must be chosen before the
   /// prompt; the finished design then goes into the cart for this store.
@@ -156,6 +159,14 @@ class _CreateScreenState extends State<CreateScreen> {
       );
       return;
     }
+    // Single colour → STL, multicolour → 3MF; there's no default.
+    if (_colorType == null) {
+      setState(() => _showColorError = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pilih jenis warna (Satu warna atau Multicolor) terlebih dahulu.')),
+      );
+      return;
+    }
 
     final auth = context.read<AuthController>();
     final token = auth.token;
@@ -229,6 +240,7 @@ class _CreateScreenState extends State<CreateScreen> {
       _heightController.clear();
       setState(() {
         _showDimErrors = false;
+        _showColorError = false;
         _colorType = null;
         _pickedImages.clear();
         _pickedImageBytesList.clear();
@@ -516,8 +528,11 @@ class _CreateScreenState extends State<CreateScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          const Text(
-            'Jenis Warna (opsional)',
+          const Text.rich(
+            TextSpan(
+              text: 'Jenis Warna ',
+              children: [TextSpan(text: '*', style: TextStyle(color: Colors.red))],
+            ),
             style: TextStyle(
               fontSize: 14.5,
               fontWeight: FontWeight.w700,
@@ -526,7 +541,7 @@ class _CreateScreenState extends State<CreateScreen> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Pilih jika kamu punya keinginan — keputusan akhir dari toko sesuai kemampuan printernya',
+            'Wajib dipilih — Satu warna menghasilkan file STL (model polos). Multicolor menghasilkan file 3MF berwarna, siap cetak multi-filamen (AMS).',
             style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 10),
@@ -538,11 +553,20 @@ class _CreateScreenState extends State<CreateScreen> {
                 SelectableCategoryChip(
                   label: entry.value,
                   selected: _colorType == entry.key,
-                  // Tap the chosen one again to clear it.
-                  onTap: () => setState(() => _colorType = _colorType == entry.key ? null : entry.key),
+                  onTap: () => setState(() {
+                    _colorType = entry.key;
+                    _showColorError = false;
+                  }),
                 ),
             ],
           ),
+          if (_showColorError && _colorType == null) ...[
+            const SizedBox(height: 6),
+            const Text(
+              'Pilih Satu warna atau Multicolor',
+              style: TextStyle(fontSize: 12, color: Colors.red),
+            ),
+          ],
                 ],
               ),
             ),

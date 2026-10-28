@@ -367,8 +367,17 @@ class _JobDetailViewState extends State<JobDetailView> {
                               ],
                             ),
                             if (detail.primaryModel?.weightLabel != null) ...[
-                              const SizedBox(height: 10),
-                              _WeightEstimateChip(label: detail.primaryModel!.weightLabel!),
+                              const SizedBox(height: 12),
+                              _PrintEstimateCard(
+                                // The autoscaled size is only final once the job is done.
+                                size: detail.status == AiJobStatus.succeeded ? detail.primaryModel!.sizeLabel : null,
+                                weight: detail.primaryModel!.weightLabel!,
+                                totalFilament: detail.isMulticolor && detail.status == AiJobStatus.succeeded
+                                    ? formatGramEstimate(detail.totalFilamentGrams)
+                                    : null,
+                                // The refine banner below already covers a failed Stage 2.
+                                singleColorFallback: detail.multiColorFallback && !detail.isStuckWithoutRefine,
+                              ),
                             ],
                             if (detail.negativePrompt?.isNotEmpty == true) ...[
                               const SizedBox(height: 8),
@@ -527,34 +536,90 @@ class _JobDetailViewState extends State<JobDetailView> {
   }
 }
 
-/// Estimated filament weight of the generated model (AIModel.Weight).
-class _WeightEstimateChip extends StatelessWidget {
-  final String label;
+/// The print as the backend autoscaled it: final size, item weight (AIModel.Weight)
+/// and, for multicolour, the filament used including colour-change waste.
+class _PrintEstimateCard extends StatelessWidget {
+  final String? size;
+  final String weight;
+  final String? totalFilament;
+  final bool singleColorFallback;
 
-  const _WeightEstimateChip({required this.label});
+  const _PrintEstimateCard({required this.size, required this.weight, this.totalFilament, this.singleColorFallback = false});
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: AppColors.purple.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.scale_outlined, size: 16, color: AppColors.purple),
-            const SizedBox(width: 6),
-            Text(
-              'Estimasi berat $label',
-              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.purple),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: AppColors.purple.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (size != null) ...[
+            _EstimateRow(icon: Icons.straighten_rounded, label: 'Ukuran hasil cetak', value: size!),
+            const Padding(
+              padding: EdgeInsets.only(left: 26, top: 2, bottom: 8),
+              child: Text(
+                'Panjang × lebar × tinggi. Proporsi model dijaga, jadi sisi terpanjang mengikuti ukuranmu.',
+                style: TextStyle(fontSize: 11.5, height: 1.3, color: AppColors.textSecondary),
+              ),
             ),
           ],
-        ),
+          _EstimateRow(icon: Icons.scale_outlined, label: 'Estimasi berat barang', value: weight),
+          if (totalFilament != null) ...[
+            const SizedBox(height: 8),
+            _EstimateRow(icon: Icons.palette_outlined, label: 'Total filamen terpakai', value: totalFilament!),
+            const Padding(
+              padding: EdgeInsets.only(left: 26, top: 2),
+              child: Text(
+                'Multicolor: termasuk filamen terbuang saat ganti warna.',
+                style: TextStyle(fontSize: 11.5, height: 1.3, color: AppColors.textSecondary),
+              ),
+            ),
+          ],
+          if (singleColorFallback) ...[
+            const SizedBox(height: 10),
+            const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline_rounded, size: 18, color: AppColors.orangeDeep),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Pewarnaan multi-filamen tidak berhasil diproses, jadi file 3MF dibuat satu warna. Toko tetap bisa mencetak dengan warna sesuai arahanmu.',
+                    style: TextStyle(fontSize: 11.5, height: 1.35, color: AppColors.orangeDeep, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
+    );
+  }
+}
+
+class _EstimateRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _EstimateRow({required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: AppColors.purple),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(label, style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+        ),
+        Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+      ],
     );
   }
 }

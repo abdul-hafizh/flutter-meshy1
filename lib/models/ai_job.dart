@@ -37,11 +37,25 @@ extension AiJobStatusX on String {
 
 double? _toDouble(dynamic v) => v is num ? v.toDouble() : double.tryParse('${v ?? ''}');
 
-/// "± 12,5 gram" — the backend's estimate (AIModel.Weight), null when unknown.
+/// "± 12,5 gram" / "± 1,7 kg" — the backend's estimate (AIModel.Weight), null when unknown.
 String? formatGramEstimate(double? grams) {
   if (grams == null || grams <= 0) return null;
-  final rounded = grams >= 10 ? grams.round().toString() : grams.toStringAsFixed(1).replaceAll('.', ',');
+  if (grams >= 1000) return '± ${_oneDecimal(grams / 1000)} kg';
+  final rounded = grams >= 10 ? grams.round().toString() : _oneDecimal(grams);
   return '± $rounded gram';
+}
+
+/// 14.5 → "14,5", 20.0 → "20".
+String _oneDecimal(double v) {
+  final r = (v * 10).round() / 10;
+  return r == r.roundToDouble() ? r.toInt().toString() : r.toStringAsFixed(1).replaceAll('.', ',');
+}
+
+/// "20 × 14,5 × 16,5 cm" (panjang × lebar × tinggi) from millimetres, null when unknown.
+String? formatPrintSize(double? lengthMm, double? widthMm, double? heightMm) {
+  final dims = [lengthMm, widthMm, heightMm];
+  if (dims.any((d) => d == null || d <= 0)) return null;
+  return '${dims.map((d) => _oneDecimal(d! / 10)).join(' × ')} cm';
 }
 
 class AiModelFile {
@@ -133,6 +147,9 @@ class AiModel {
   }
 
   String? get weightLabel => formatGramEstimate(weightGrams);
+
+  /// Size after the backend's proportional autoscale (Depth = panjang).
+  String? get sizeLabel => formatPrintSize(depth, width, height);
 
   String? get previewUrl => previews.isEmpty ? null : previews.first.previewPath;
 
@@ -262,6 +279,15 @@ class AiJobDetail {
   /// File types offered under "Unduh Model".
   final List<ModelDownloadFormat> downloadFormats;
 
+  /// Customer chose Multicolor (3MF) rather than Satu warna (STL).
+  final bool isMulticolor;
+
+  /// Filament pulled from the spool, incl. colour-change purge and prime tower.
+  final double? totalFilamentGrams;
+
+  /// Multicolour job that ended without Meshy's multi-colour 3MF — its 3MF is single-colour.
+  final bool multiColorFallback;
+
   const AiJobDetail({
     required this.id,
     this.prompt,
@@ -276,6 +302,9 @@ class AiJobDetail {
     this.store,
     this.cartItemId,
     this.downloadFormats = const [],
+    this.isMulticolor = false,
+    this.totalFilamentGrams,
+    this.multiColorFallback = false,
   });
 
   factory AiJobDetail.fromJson(Map<String, dynamic> json) {
@@ -305,6 +334,9 @@ class AiJobDetail {
           .map(ModelDownloadFormat.fromJson)
           .where((f) => f.code.isNotEmpty)
           .toList(),
+      isMulticolor: json['ColorPreference']?.toString().toUpperCase() == 'MULTI',
+      totalFilamentGrams: _toDouble(json['TotalFilamentNeededGrams']),
+      multiColorFallback: json['MultiColorFallback'] == true,
     );
   }
 
