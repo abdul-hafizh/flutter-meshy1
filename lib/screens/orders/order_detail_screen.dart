@@ -739,7 +739,7 @@ class _ShipmentCardState extends State<_ShipmentCard> {
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
             ),
             const SizedBox(height: 4),
-            Text('Status: ${_result?.status ?? shipment.status}', style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+            Text('Status: ${_result?.status ?? shipment.statusLabel}', style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
             if (shipment.trackingNumber != null && shipment.trackingNumber!.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.only(top: 2),

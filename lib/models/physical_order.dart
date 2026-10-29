@@ -227,6 +227,20 @@ class ShipmentInfo {
   }
 
   bool get isPickup => shipmentType == 'PICKUP';
+
+  /// Status in words; "Ambil di Toko" has no parcel, so no "SHIPPED".
+  String get statusLabel {
+    final s = status.toUpperCase();
+    if (isPickup) {
+      return switch (s) {
+        'SHIPPED' || 'IN_TRANSIT' => 'Siap diambil di toko',
+        'DELIVERED' => 'Sudah diambil',
+        'CANCELLED' => 'Dibatalkan',
+        _ => 'Sedang disiapkan toko',
+      };
+    }
+    return status;
+  }
 }
 
 class PaymentInfo {
@@ -477,6 +491,9 @@ class PhysicalOrder {
     if (isCancelled) return OrderTab.history;
     if (isCompleted) return rating == null ? OrderTab.review : OrderTab.history;
     if (!isPaid) return OrderTab.unpaid;
+    // "Ambil di Toko" is never "Dikirim": it waits under Dikemas (ready = "Siap
+    // diambil") until the store marks it collected, which completes it.
+    if (primaryShipment?.isPickup == true) return OrderTab.packing;
     final shipmentStatus = primaryShipment?.status.toUpperCase();
     if (shipmentStatus == 'SHIPPED' || shipmentStatus == 'IN_TRANSIT' || shipmentStatus == 'DELIVERED') {
       return OrderTab.shipped;
