@@ -60,6 +60,7 @@ class AiJobService {
     double? length,
     double? width,
     double? height,
+    bool editService = false,
   }) async {
     http.Response res;
     try {
@@ -76,6 +77,7 @@ class AiJobService {
               if (length != null) 'TargetLength': length,
               if (width != null) 'TargetWidth': width,
               if (height != null) 'TargetHeight': height,
+              if (editService) 'EditService': true,
             }),
           )
           .timeout(const Duration(seconds: 30));
@@ -107,6 +109,7 @@ class AiJobService {
     double? length,
     double? width,
     double? height,
+    bool editService = false,
   }) async {
     assert(images.isNotEmpty && images.length <= 4);
     http.Response res;
@@ -140,6 +143,7 @@ class AiJobService {
       if (length != null) request.fields['TargetLength'] = '$length';
       if (width != null) request.fields['TargetWidth'] = '$width';
       if (height != null) request.fields['TargetHeight'] = '$height';
+      if (editService) request.fields['EditService'] = 'true';
 
       final streamed = await request.send().timeout(const Duration(seconds: 60));
       res = await http.Response.fromStream(streamed);

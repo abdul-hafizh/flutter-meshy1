@@ -15,6 +15,7 @@ import '../../services/merchant_service.dart';
 import '../../services/order_service.dart';
 import '../../services/shipment_tracking_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/checkout/shipping_widgets.dart' show rupiahLabel;
 import '../../widgets/gradient_button.dart';
 import '../../widgets/store_picker.dart' show StoreSummaryTile;
 import '../../widgets/store_status.dart';
@@ -307,6 +308,23 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                                   Text(
                                     'Jenis warna: ${order.primaryItem!.colorTypeLabel}',
                                     style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                  ),
+                                ],
+                              ),
+                            ],
+                            if (order.hasEditService) ...[
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  const Icon(Icons.design_services_outlined, size: 16, color: AppColors.textSecondary),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      order.editServiceTotal > 0
+                                          ? 'Jasa edit: ${rupiahLabel(order.editServiceTotal)} (sudah termasuk di total)'
+                                          : 'Jasa edit: menunggu harga dari toko',
+                                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -871,7 +889,9 @@ class _ActionArea extends StatelessWidget {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _awaitingPriceBanner(
           order.awaitingMerchantConfirmation
-              ? 'Toko sedang memeriksa berat cetak desainmu. Harga final dikonfirmasi toko, lalu kamu bisa membayar dari sini.'
+              ? order.hasEditService
+                  ? 'Toko sedang memeriksa berat cetak desainmu dan menentukan harga jasa edit. Setelah harganya diisi toko, kamu bisa membayar dari sini.'
+                  : 'Toko sedang memeriksa berat cetak desainmu. Harga final dikonfirmasi toko, lalu kamu bisa membayar dari sini.'
               : 'Menunggu konfirmasi harga dari penjual. Halaman ini akan otomatis diperbarui.',
         ),
         _cancelButton(),

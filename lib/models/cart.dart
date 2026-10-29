@@ -40,6 +40,9 @@ class CartDesign {
   final int? materialId;
   final String? materialName;
 
+  /// "Gunakan jasa edit" was ticked: the store prices it after checkout.
+  final bool editServiceRequested;
+
   const CartDesign({
     required this.aiModelId,
     this.aiJobId,
@@ -48,6 +51,7 @@ class CartDesign {
     this.weightGrams,
     this.materialId,
     this.materialName,
+    this.editServiceRequested = false,
   });
 
   factory CartDesign.fromJson(Map<String, dynamic> json) {
@@ -60,6 +64,7 @@ class CartDesign {
       weightGrams: json['WeightGrams'] is num ? (json['WeightGrams'] as num).toDouble() : null,
       materialId: material == null ? null : _asInt(material['Id']),
       materialName: material?['Name']?.toString(),
+      editServiceRequested: json['EditServiceRequested'] == true,
     );
   }
 }

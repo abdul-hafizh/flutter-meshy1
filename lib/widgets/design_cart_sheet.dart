@@ -12,7 +12,7 @@ import 'checkout/shipping_widgets.dart' show rupiahLabel;
 import 'gradient_button.dart';
 
 /// Bottom sheet to put a finished AI design into the cart: pick one of the
-/// store's materials (price follows the design's weight × that material)
+/// admin's price-master materials (price follows the design's weight × that material)
 /// and a quantity. Resolves to true when the cart was updated.
 Future<bool> showDesignCartSheet(BuildContext context, {required String aiModelId}) async {
   final added = await showModalBottomSheet<bool>(
@@ -151,7 +151,7 @@ class _DesignCartSheetState extends State<_DesignCartSheet> {
                       const SizedBox(height: 8),
                       if (options.materials.isEmpty)
                         const Text(
-                          'Toko ini belum punya material aktif. Hubungi toko lewat chat.',
+                          'Harga material untuk berat desain ini belum tersedia. Silakan coba lagi nanti atau hubungi toko lewat chat.',
                           style: TextStyle(fontSize: 13, color: AppColors.orangeDeep),
                         )
                       else

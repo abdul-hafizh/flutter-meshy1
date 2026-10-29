@@ -80,6 +80,8 @@ class _CartCheckoutScreenState extends State<CartCheckoutScreen> {
   // print weight (= the price) — it's paid later from "Pesanan".
   bool _awaitsStore(CartCheckoutGroup g) => g.items.any((i) => i.isDesign);
   bool get _anyAwaiting => _groups.any(_awaitsStore);
+  // Jasa edit asked for on a design: the store prices it during that confirmation.
+  bool get _anyEditService => _groups.any((g) => g.items.any((i) => i.design?.editServiceRequested == true));
   // Biaya jasa aplikasi — once for this payment; an order awaiting its store
   // pays its own when it's paid later.
   int get _appFee => _groups.any((g) => !_awaitsStore(g)) ? TaxConfig.appFee : 0;
@@ -256,8 +258,11 @@ class _CartCheckoutScreenState extends State<CartCheckoutScreen> {
       // The bought lines are gone from the cart now.
       unawaited(context.read<CartController>().refresh(token));
 
-      const awaitingText = 'Pesanan desain AI dikirim ke toko. Toko akan memeriksa berat cetak dan mengonfirmasi harganya — '
-          'setelah itu kamu bisa membayarnya dari menu Pesanan.';
+      final awaitingText = _anyEditService
+          ? 'Pesanan desain AI dikirim ke toko. Toko akan memeriksa berat cetak dan menentukan harga jasa edit — '
+              'setelah itu kamu bisa membayarnya dari menu Pesanan.'
+          : 'Pesanan desain AI dikirim ke toko. Toko akan memeriksa berat cetak dan mengonfirmasi harganya — '
+              'setelah itu kamu bisa membayarnya dari menu Pesanan.';
       if (!result.hasPayment) {
         await _info(
           result.awaitingConfirmation > 0 && result.paymentError == null ? 'Menunggu konfirmasi toko' : 'Pesanan sudah dibuat',
@@ -338,9 +343,13 @@ class _CartCheckoutScreenState extends State<CartCheckoutScreen> {
                         const SizedBox(height: 18),
                       ],
                       if (_anyAwaiting) ...[
-                        const CheckoutInfoNote(
-                          text: 'Desain AI: berat di aplikasi masih perkiraan. Toko akan memeriksa berat cetak dan '
-                              'mengonfirmasi harganya dulu — kamu membayarnya dari menu Pesanan setelah dikonfirmasi.',
+                        CheckoutInfoNote(
+                          text: _anyEditService
+                              ? 'Desain AI dengan jasa edit: toko akan memeriksa berat cetak dan menentukan harga jasa '
+                                  'edit dulu. Total di bawah belum termasuk jasa edit — kamu membayarnya dari menu Pesanan '
+                                  'setelah toko mengisi harganya.'
+                              : 'Desain AI: berat di aplikasi masih perkiraan. Toko akan memeriksa berat cetak dan '
+                                  'mengonfirmasi harganya dulu — kamu membayarnya dari menu Pesanan setelah dikonfirmasi.',
                         ),
                         const SizedBox(height: 14),
                       ],

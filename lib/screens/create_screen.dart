@@ -56,6 +56,10 @@ class _CreateScreenState extends State<CreateScreen> {
   /// Set after a Generate tap with no colour type, so the section turns red.
   bool _showColorError = false;
 
+  /// Optional "Gunakan jasa edit": the store prices the edit after checkout,
+  /// and the order can only be paid once it has.
+  bool _editService = false;
+
   /// The store that will print the design — must be chosen before the
   /// prompt; the finished design then goes into the cart for this store.
   NearbyMerchant? _store;
@@ -211,6 +215,7 @@ class _CreateScreenState extends State<CreateScreen> {
           length: targetLength,
           width: targetWidth,
           height: targetHeight,
+          editService: _editService,
         );
       } else {
         await AiJobService.createImageTo3D(
@@ -230,6 +235,7 @@ class _CreateScreenState extends State<CreateScreen> {
           length: targetLength,
           width: targetWidth,
           height: targetHeight,
+          editService: _editService,
         );
       }
       if (!mounted) return;
@@ -242,6 +248,7 @@ class _CreateScreenState extends State<CreateScreen> {
         _showDimErrors = false;
         _showColorError = false;
         _colorType = null;
+        _editService = false;
         _pickedImages.clear();
         _pickedImageBytesList.clear();
       });
@@ -567,6 +574,11 @@ class _CreateScreenState extends State<CreateScreen> {
               style: TextStyle(fontSize: 12, color: Colors.red),
             ),
           ],
+          const SizedBox(height: 20),
+          _EditServiceOption(
+            value: _editService,
+            onChanged: (v) => setState(() => _editService = v),
+          ),
                 ],
               ),
             ),
@@ -583,6 +595,64 @@ class _CreateScreenState extends State<CreateScreen> {
             onPressed: _canGenerate && !_generating ? _generate : null,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Optional "Gunakan jasa edit" — the store edits the 3D model and prices
+/// that work after checkout; the order is paid once the price is in.
+class _EditServiceOption extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _EditServiceOption({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: value ? AppColors.purple.withValues(alpha: 0.07) : Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => onChanged(!value),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(4, 8, 12, 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: value ? AppColors.purple : AppColors.border),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Checkbox(
+                value: value,
+                activeColor: AppColors.purple,
+                onChanged: (v) => onChanged(v ?? false),
+              ),
+              const Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(top: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Gunakan jasa edit (opsional)',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                      ),
+                      SizedBox(height: 3),
+                      Text(
+                        'Toko akan merapikan/mengedit model 3D sesuai catatanmu. Harga jasa edit ditentukan toko setelah '
+                        'checkout — pesanan baru bisa dibayar setelah toko mengisi harganya.',
+                        style: TextStyle(fontSize: 12, height: 1.35, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -14,21 +14,25 @@ import '../gradient_button.dart';
 /// "Kirim File Cetak": the customer picks a ready-to-print file (STL, OBJ,
 /// 3MF, STEP), a material and quantity, and sends it to the store in this
 /// chat. The file goes to Petope's server (not the chat provider); the
-/// store creates the order for it in its dashboard.
-Future<void> showPrintFileSheet(BuildContext context, {required String merchantId}) {
-  return showModalBottomSheet<void>(
+/// store creates the order for it in its dashboard. [fileName]/[bytes]
+/// pre-fill the file (a file shared to Petope). Resolves to true once sent.
+Future<bool> showPrintFileSheet(BuildContext context, {required String merchantId, String? fileName, Uint8List? bytes}) async {
+  final sent = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     backgroundColor: AppColors.surface,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-    builder: (_) => _PrintFileSheet(merchantId: merchantId),
+    builder: (_) => _PrintFileSheet(merchantId: merchantId, initialFileName: fileName, initialBytes: bytes),
   );
+  return sent == true;
 }
 
 class _PrintFileSheet extends StatefulWidget {
   final String merchantId;
+  final String? initialFileName;
+  final Uint8List? initialBytes;
 
-  const _PrintFileSheet({required this.merchantId});
+  const _PrintFileSheet({required this.merchantId, this.initialFileName, this.initialBytes});
 
   @override
   State<_PrintFileSheet> createState() => _PrintFileSheetState();
@@ -47,6 +51,10 @@ class _PrintFileSheetState extends State<_PrintFileSheet> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialFileName != null && widget.initialBytes != null) {
+      _fileName = widget.initialFileName;
+      _bytes = widget.initialBytes;
+    }
     _loadMaterials();
   }
 
@@ -116,8 +124,8 @@ class _PrintFileSheetState extends State<_PrintFileSheet> {
         notes: _notes.text,
       );
       if (!mounted) return;
-      Navigator.of(context).pop();
       _toast(message);
+      Navigator.of(context).pop(true);
     } on ApiException catch (e) {
       if (mounted) _toast(e.message);
     } finally {

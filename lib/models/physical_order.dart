@@ -102,6 +102,12 @@ class PhysicalOrderItem {
         _ => null,
       };
 
+  /// "Gunakan jasa edit" was ticked on the prompt screen.
+  final bool editServiceRequested;
+
+  /// The store's price for that edit (once per design), null until set.
+  final int? editServiceFee;
+
   const PhysicalOrderItem({
     required this.id,
     this.quantity,
@@ -111,6 +117,8 @@ class PhysicalOrderItem {
     this.aiOwnerUserId,
     this.aiPrompt,
     this.colorType,
+    this.editServiceRequested = false,
+    this.editServiceFee,
   });
 
   factory PhysicalOrderItem.fromJson(Map<String, dynamic> json) {
@@ -125,6 +133,9 @@ class PhysicalOrderItem {
       aiOwnerUserId: jobJson?['UserId']?.toString(),
       aiPrompt: jobJson?['Prompt']?.toString(),
       colorType: json['ColorType']?.toString(),
+      editServiceRequested: jobJson?['EditServiceRequested'] == true,
+      // DECIMAL column — the API sends it as a string.
+      editServiceFee: double.tryParse('${json['EditServiceFee'] ?? ''}')?.round(),
     );
   }
 }
@@ -393,6 +404,12 @@ class PhysicalOrder {
   }
 
   PhysicalOrderItem? get primaryItem => items.isEmpty ? null : items.first;
+
+  /// A design in this order asked for jasa edit.
+  bool get hasEditService => items.any((i) => i.editServiceRequested);
+
+  /// Jasa edit the store priced, summed over the order's designs (0 when none / not yet).
+  int get editServiceTotal => items.fold(0, (sum, i) => sum + (i.editServiceFee ?? 0));
 
   /// Title + picture for a list row, covering all three ways an order is
   /// made: a marketplace product, a customer's own AI design, or a

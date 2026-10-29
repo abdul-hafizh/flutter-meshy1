@@ -493,6 +493,13 @@ class _CartLineTile extends StatelessWidget {
                       ].join(' · '),
                       style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                     ),
+                    if (design.editServiceRequested) ...[
+                      const SizedBox(height: 2),
+                      const Text(
+                        '+ Jasa edit — harga dari toko setelah checkout',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.orangeDeep),
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     InkWell(
                       onTap: busy ? null : onNotes,
