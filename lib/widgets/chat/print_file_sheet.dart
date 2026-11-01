@@ -9,6 +9,7 @@ import '../../providers/auth_controller.dart';
 import '../../services/auth_service.dart' show ApiException;
 import '../../services/print_file_service.dart';
 import '../../theme/app_theme.dart';
+import '../edit_service_option.dart';
 import '../gradient_button.dart';
 
 /// "Kirim File Cetak": the customer picks a ready-to-print file (STL, OBJ,
@@ -43,6 +44,7 @@ class _PrintFileSheetState extends State<_PrintFileSheet> {
   List<String> _materials = [];
   String? _material;
   int _quantity = 1;
+  bool _editService = false;
   String? _fileName;
   Uint8List? _bytes;
   bool _picking = false;
@@ -122,6 +124,7 @@ class _PrintFileSheetState extends State<_PrintFileSheet> {
         materialName: _material,
         quantity: _quantity,
         notes: _notes.text,
+        editService: _editService,
       );
       if (!mounted) return;
       _toast(message);
@@ -218,7 +221,14 @@ class _PrintFileSheetState extends State<_PrintFileSheet> {
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
+            EditServiceOption(
+              value: _editService,
+              onChanged: (v) => setState(() => _editService = v),
+              description: 'Toko akan mengedit file sesuai catatanmu dan menentukan harga jasa editnya saat membuat pesanan. '
+                  'Kamu melihat total harganya di menu Pesanan — setuju lalu bayar, atau batalkan bila tidak setuju.',
+            ),
+            const SizedBox(height: 14),
             GradientButton(
               label: _sending ? 'Mengirim...' : 'Kirim ke Toko',
               icon: Icons.send_rounded,
@@ -266,6 +276,7 @@ class _PrintFileCard extends StatelessWidget {
     final material = data['materialName']?.toString();
     final qty = data['quantity']?.toString() ?? '1';
     final notes = data['notes']?.toString();
+    final editService = data['editServiceRequested'] == true;
     return Container(
       width: 260,
       margin: const EdgeInsets.all(4),
@@ -310,6 +321,14 @@ class _PrintFileCard extends StatelessWidget {
                     child: Text(
                       '“$notes”',
                       style: const TextStyle(fontSize: 11.5, fontStyle: FontStyle.italic, color: AppColors.textSecondary),
+                    ),
+                  ),
+                if (editService)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 4),
+                    child: Text(
+                      '✏️ Minta jasa edit',
+                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.orange),
                     ),
                   ),
               ],

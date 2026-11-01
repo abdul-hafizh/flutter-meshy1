@@ -12,6 +12,7 @@ import '../../services/api_config.dart';
 import '../../services/auth_service.dart' show ApiException;
 import '../../services/invoice_service.dart';
 import '../../services/merchant_service.dart';
+import '../../services/order_return_service.dart';
 import '../../services/order_service.dart';
 import '../../services/shipment_tracking_service.dart';
 import '../../theme/app_theme.dart';
@@ -20,6 +21,7 @@ import '../../widgets/gradient_button.dart';
 import '../../widgets/store_picker.dart' show StoreSummaryTile;
 import '../../widgets/store_status.dart';
 import 'checkout_screen.dart';
+import 'order_return_screen.dart';
 
 /// Renders inline inside the "Pesanan Fisik" tab (not pushed as its own
 /// route) — same convention as `JobDetailView` for AI jobs, so the bottom
@@ -167,11 +169,17 @@ class _OrderDetailViewState extends State<OrderDetailView> {
     final token = _token;
     final order = _order;
     if (token == null || order == null) return;
+    // The store priced the jasa edit the customer asked for — cancelling now means not agreeing to it.
+    final decliningEdit = order.awaitsEditPriceApproval;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Batalkan pesanan?'),
-        content: const Text('Pesanan yang dibatalkan tidak bisa dipulihkan.'),
+        title: Text(decliningEdit ? 'Tidak setuju dengan harga jasa edit?' : 'Batalkan pesanan?'),
+        content: Text(
+          decliningEdit
+              ? 'Pesanan akan dibatalkan dan toko diberi tahu. Pesanan yang dibatalkan tidak bisa dipulihkan.'
+              : 'Pesanan yang dibatalkan tidak bisa dipulihkan.',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Tidak')),
           TextButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Ya, Batalkan')),
@@ -182,7 +190,11 @@ class _OrderDetailViewState extends State<OrderDetailView> {
 
     setState(() => _cancelling = true);
     try {
-      await OrderService.cancel(token: token, orderId: order.id);
+      await OrderService.cancel(
+        token: token,
+        orderId: order.id,
+        reason: decliningEdit ? 'Customer tidak setuju dengan harga jasa edit' : null,
+      );
       await _load();
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -217,6 +229,13 @@ class _OrderDetailViewState extends State<OrderDetailView> {
     } finally {
       if (mounted) setState(() => _submittingRating = false);
     }
+  }
+
+  Future<void> _openReturnForm() async {
+    final order = _order;
+    if (order == null) return;
+    final sent = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => OrderReturnScreen(order: order)));
+    if (sent == true && mounted) await _load();
   }
 
   Future<void> _openInvoice() async {
@@ -294,7 +313,7 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                                   ),
                                 ),
-                                if (order.status != null) _StatusPill(status: order.status!),
+                                if (order.status != null) _StatusPill(status: order.status!, label: order.statusLabel),
                               ],
                             ),
                             const SizedBox(height: 16),
@@ -327,6 +346,14 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                                     ),
                                   ),
                                 ],
+                              ),
+                            ],
+                            if (order.primaryItem?.aiJobId != null && order.primaryItem!.aiPromptImageIds.isNotEmpty) ...[
+                              const SizedBox(height: 14),
+                              _PromptImagesCard(
+                                jobId: order.primaryItem!.aiJobId!,
+                                imageIds: order.primaryItem!.aiPromptImageIds,
+                                token: _token,
                               ),
                             ],
                             if (order.printFiles.isNotEmpty) ...[
@@ -366,6 +393,10 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                               onCancel: _cancelOrder,
                               rupiah: _rupiah,
                             ),
+                            if (order.returnInfo != null || order.canRequestReturn) ...[
+                              const SizedBox(height: 14),
+                              _ReturnSection(order: order, token: _token, onRequest: _openReturnForm),
+                            ],
                             if (order.statusHistories.isNotEmpty) ...[
                               const SizedBox(height: 22),
                               const Text(
@@ -394,6 +425,219 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                         ),
         ),
       ],
+    );
+  }
+}
+
+/// The customer's own photos an image-to-3D design was prompted with.
+class _PromptImagesCard extends StatelessWidget {
+  final String jobId;
+  final List<String> imageIds;
+  final String? token;
+
+  const _PromptImagesCard({required this.jobId, required this.imageIds, required this.token});
+
+  Widget _image(String id, {BoxFit fit = BoxFit.cover}) => Image.network(
+        '${ApiConfig.baseUrl}/ai/jobs/$jobId/images/$id',
+        headers: token != null ? {'Authorization': 'Bearer $token'} : null,
+        fit: fit,
+        errorBuilder: (_, _, _) => const Center(child: Icon(Icons.broken_image_outlined, color: AppColors.textFaint)),
+      );
+
+  void _open(BuildContext context, String id) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            InteractiveViewer(child: _image(id, fit: BoxFit.contain)),
+            Positioned(
+              top: 4,
+              right: 4,
+              child: IconButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Gambar Prompt', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+          const SizedBox(height: 2),
+          const Text(
+            'Gambar asli yang kamu kirim untuk membuat desain ini.',
+            style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final id in imageIds)
+                GestureDetector(
+                  onTap: () => _open(context, id),
+                  child: Container(
+                    width: 84,
+                    height: 84,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceMuted,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: _image(id),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Pengembalian: the request's status, what was sent and the store's reply —
+/// or, when allowed, the "Ajukan Pengembalian" button.
+class _ReturnSection extends StatelessWidget {
+  final PhysicalOrder order;
+  final String? token;
+  final VoidCallback onRequest;
+
+  const _ReturnSection({required this.order, required this.token, required this.onRequest});
+
+  static String _date(DateTime d) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    return '${d.day} ${months[d.month - 1]} ${d.year}';
+  }
+
+  Color _statusColor(String status) => switch (status) {
+        'REFUNDED' => AppColors.success,
+        'REJECTED' => const Color(0xFFE0453A),
+        'APPROVED' => AppColors.info,
+        _ => AppColors.orangeDeep,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final r = order.returnInfo;
+    if (r == null) {
+      final deadline = order.returnDeadline;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          OutlinedButton.icon(
+            onPressed: onRequest,
+            icon: const Icon(Icons.assignment_return_outlined, size: 18),
+            label: const Text('Ajukan Pengembalian'),
+          ),
+          if (deadline != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'Barang rusak atau tidak sesuai? Ajukan pengembalian sebelum ${_date(deadline)}.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+              ),
+            ),
+        ],
+      );
+    }
+
+    final color = _statusColor(r.status);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.assignment_return_outlined, size: 18, color: AppColors.purple),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('Pengembalian', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(20)),
+                child: Text(
+                  switch (r.status) { 'REQUESTED' => 'Menunggu Toko', 'APPROVED' => 'Disetujui', 'REJECTED' => 'Ditolak', _ => 'Selesai' },
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(r.label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: color)),
+          const SizedBox(height: 6),
+          Text(r.reason, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+          Text(r.description, style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+          if (r.imageIds.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final id in r.imageIds)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      OrderReturnService.imageUrl(r.id, id),
+                      headers: token != null ? {'Authorization': 'Bearer $token'} : null,
+                      width: 64,
+                      height: 64,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => Container(
+                        width: 64,
+                        height: 64,
+                        color: AppColors.surfaceMuted,
+                        child: const Icon(Icons.broken_image_outlined, color: AppColors.textFaint),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+          if (r.merchantNote != null && r.merchantNote!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text('Tanggapan toko: ${r.merchantNote}', style: const TextStyle(fontSize: 12.5, color: AppColors.textPrimary)),
+          ],
+          if (r.adminNote != null && r.adminNote!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text('Catatan Petope: ${r.adminNote}', style: const TextStyle(fontSize: 12.5, color: AppColors.textPrimary)),
+          ],
+          if (r.refundAmount > 0 && r.status != 'REJECTED') ...[
+            const SizedBox(height: 8),
+            Text(
+              r.status == 'REFUNDED'
+                  ? 'Dana ${rupiahLabel(r.refundAmount)} sudah dikembalikan${r.refundedAt != null ? ' pada ${_date(r.refundedAt!)}' : ''}.'
+                  : 'Dana yang dikembalikan bila disetujui: ${rupiahLabel(r.refundAmount)}',
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -833,14 +1077,14 @@ class _ActionArea extends StatelessWidget {
     required this.rupiah,
   });
 
-  Widget _cancelButton() {
+  Widget _cancelButton({String label = 'Batalkan Pesanan'}) {
     return Padding(
       padding: const EdgeInsets.only(top: 6),
       child: Center(
         child: TextButton(
           onPressed: cancelling ? null : onCancel,
           child: Text(
-            cancelling ? 'Membatalkan...' : 'Batalkan Pesanan',
+            cancelling ? 'Membatalkan...' : label,
             style: const TextStyle(color: Color(0xFFE0453A), fontWeight: FontWeight.w700),
           ),
         ),
@@ -900,6 +1144,32 @@ class _ActionArea extends StatelessWidget {
     return _buildPricedArea(context);
   }
 
+  /// The store priced the jasa edit the customer asked for: agree and pay, or decline and cancel.
+  Widget _editPriceNotice() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.purple.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.purple.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.design_services_outlined, size: 20, color: AppColors.purple),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Toko menetapkan harga jasa edit ${rupiah(order.editServiceTotal)}, sudah termasuk di total di bawah. '
+              'Setuju? Lanjutkan ke pembayaran. Tidak setuju? Batalkan pesanan.',
+              style: const TextStyle(fontSize: 12.5, height: 1.4, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _awaitingPriceBanner(String message) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -932,9 +1202,14 @@ class _ActionArea extends StatelessWidget {
       final ppn = order.ppn;
       final appFee = order.appFeeDue;
       final hasBreakdown = subtotalAmount != null;
+      final approveEdit = order.awaitsEditPriceApproval;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (approveEdit) ...[
+            _editPriceNotice(),
+            const SizedBox(height: 12),
+          ],
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -946,6 +1221,7 @@ class _ActionArea extends StatelessWidget {
               children: [
                 if (hasBreakdown) ...[
                   _priceRow('Harga Barang', rupiah(ppn.subtotal)),
+                  if (order.editServiceTotal > 0) _priceRow('• termasuk Jasa Edit', rupiah(order.editServiceTotal)),
                   if (discountAmount > 0) _priceRow(order.tierDiscountLabel, '-${rupiah(ppn.discount)}', valueColor: const Color(0xFF1FAA59)),
                   if (appFee > 0) _priceRow('Biaya Jasa Aplikasi', rupiah(appFee)),
                   if (order.promoDiscountAmount > 0)
@@ -970,8 +1246,12 @@ class _ActionArea extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          GradientButton(label: 'Lengkapi Pesanan', icon: Icons.arrow_forward_rounded, onPressed: onCheckout),
-          _cancelButton(),
+          GradientButton(
+            label: approveEdit ? 'Setuju & Lanjut Bayar' : 'Lengkapi Pesanan',
+            icon: Icons.arrow_forward_rounded,
+            onPressed: onCheckout,
+          ),
+          _cancelButton(label: approveEdit ? 'Tidak Setuju, Batalkan Pesanan' : 'Batalkan Pesanan'),
         ],
       );
     }
@@ -982,7 +1262,7 @@ class _ActionArea extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _ShipmentCard(shipment: shipment),
-        if (!isCompleted) ...[
+        if (!isCompleted && !order.isInReturn) ...[
           const SizedBox(height: 14),
           GradientButton(
             label: confirmingReceipt ? 'Memproses...' : 'Pesanan Diterima',
@@ -1091,8 +1371,9 @@ class _ActionArea extends StatelessWidget {
 
 class _StatusPill extends StatelessWidget {
   final OrderStatusInfo status;
+  final String? label;
 
-  const _StatusPill({required this.status});
+  const _StatusPill({required this.status, this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -1100,7 +1381,7 @@ class _StatusPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(20)),
-      child: Text(status.name, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+      child: Text(label ?? status.name, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
     );
   }
 

@@ -184,11 +184,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 16),
                 AppTextField(
                   controller: _phoneController,
-                  label: 'No. Telepon',
+                  label: 'No HP',
                   hint: '08xxxxxxxxxx',
                   icon: Icons.phone_outlined,
                   keyboardType: TextInputType.phone,
-                  validator: (v) => (v?.trim().isEmpty ?? true) ? 'No. telepon wajib diisi' : null,
+                  validator: (v) => (v?.trim().isEmpty ?? true) ? 'No HP wajib diisi' : null,
                 ),
                 const SizedBox(height: 16),
                 AppTextField(

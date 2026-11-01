@@ -93,6 +93,11 @@ class PhysicalOrderItem {
   /// The text prompt behind [aiModel], if it was a text-to-3D job.
   final String? aiPrompt;
 
+  /// The AI job behind [aiModel] and the photos the customer prompted it
+  /// with (image-to-3D) — served by GET /ai/jobs/:aiJobId/images/:id.
+  final String? aiJobId;
+  final List<String> aiPromptImageIds;
+
   /// SINGLE (satu warna) or MULTI (multicolor), set by the store on a custom order.
   final String? colorType;
 
@@ -102,7 +107,8 @@ class PhysicalOrderItem {
         _ => null,
       };
 
-  /// "Gunakan jasa edit" was ticked on the prompt screen.
+  /// "Gunakan jasa edit" was ticked — on the prompt screen, or when sending a
+  /// ready-to-print file (that order is made with the store's price already in).
   final bool editServiceRequested;
 
   /// The store's price for that edit (once per design), null until set.
@@ -116,6 +122,8 @@ class PhysicalOrderItem {
     this.product,
     this.aiOwnerUserId,
     this.aiPrompt,
+    this.aiJobId,
+    this.aiPromptImageIds = const [],
     this.colorType,
     this.editServiceRequested = false,
     this.editServiceFee,
@@ -124,6 +132,8 @@ class PhysicalOrderItem {
   factory PhysicalOrderItem.fromJson(Map<String, dynamic> json) {
     final aiJson = json['AIModel'] is Map<String, dynamic> ? json['AIModel'] as Map<String, dynamic> : null;
     final jobJson = aiJson?['Job'] is Map<String, dynamic> ? aiJson!['Job'] as Map<String, dynamic> : null;
+    // DECIMAL column — the API sends it as a string.
+    final editFee = double.tryParse('${json['EditServiceFee'] ?? ''}')?.round();
     return PhysicalOrderItem(
       id: json['Id']?.toString() ?? '',
       quantity: json['Quantity'] is int ? json['Quantity'] as int : int.tryParse('${json['Quantity']}'),
@@ -132,10 +142,15 @@ class PhysicalOrderItem {
       product: json['Product'] is Map<String, dynamic> ? OrderProductInfo.fromJson(json['Product'] as Map<String, dynamic>) : null,
       aiOwnerUserId: jobJson?['UserId']?.toString(),
       aiPrompt: jobJson?['Prompt']?.toString(),
+      aiJobId: jobJson?['Id']?.toString(),
+      aiPromptImageIds: (jobJson?['Images'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map((e) => e['Id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toList(),
       colorType: json['ColorType']?.toString(),
-      editServiceRequested: jobJson?['EditServiceRequested'] == true,
-      // DECIMAL column — the API sends it as a string.
-      editServiceFee: double.tryParse('${json['EditServiceFee'] ?? ''}')?.round(),
+      editServiceRequested: jobJson?['EditServiceRequested'] == true || (editFee ?? 0) > 0,
+      editServiceFee: editFee,
     );
   }
 }
@@ -266,7 +281,79 @@ class PaymentInfo {
   bool get isPaid => status == 'PAID';
 }
 
-enum OrderTab { unpaid, packing, shipped, review, history }
+/// The "Riwayat Pesanan" tabs, Shopee-style (null = Semua). Names are the
+/// backend's ?tab= values (GET /orders, /orders/counts).
+enum OrderTab { unpaid, packing, shipped, completed, returns, cancelled, review }
+
+extension OrderTabLabel on OrderTab {
+  String get label => switch (this) {
+        OrderTab.unpaid => 'Belum Bayar',
+        OrderTab.packing => 'Dikemas',
+        OrderTab.shipped => 'Dikirim',
+        OrderTab.completed => 'Selesai',
+        OrderTab.returns => 'Pengembalian',
+        OrderTab.cancelled => 'Dibatalkan',
+        OrderTab.review => 'Beri Penilaian',
+      };
+}
+
+/// Pengembalian the customer asked for on an order (one per order).
+/// [status]: REQUESTED → APPROVED / REJECTED → REFUNDED.
+class OrderReturnInfo {
+  final String id;
+  final String status;
+  final String? statusLabel;
+  final String reason;
+  final String description;
+  final String? merchantNote;
+  final String? adminNote;
+  final int refundAmount;
+  final List<String> imageIds;
+  final DateTime? createdAt;
+  final DateTime? refundedAt;
+
+  const OrderReturnInfo({
+    required this.id,
+    required this.status,
+    this.statusLabel,
+    required this.reason,
+    required this.description,
+    this.merchantNote,
+    this.adminNote,
+    this.refundAmount = 0,
+    this.imageIds = const [],
+    this.createdAt,
+    this.refundedAt,
+  });
+
+  factory OrderReturnInfo.fromJson(Map<String, dynamic> json) => OrderReturnInfo(
+        id: json['Id']?.toString() ?? '',
+        status: json['Status']?.toString().toUpperCase() ?? 'REQUESTED',
+        statusLabel: json['StatusLabel']?.toString(),
+        reason: json['Reason']?.toString() ?? '',
+        description: json['Description']?.toString() ?? '',
+        merchantNote: json['MerchantNote']?.toString(),
+        adminNote: json['AdminNote']?.toString(),
+        // DECIMAL column — the API sends it as a string.
+        refundAmount: double.tryParse('${json['RefundAmount'] ?? ''}')?.round() ?? 0,
+        imageIds: (json['Images'] as List<dynamic>? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .map((e) => e['Id']?.toString() ?? '')
+            .where((id) => id.isNotEmpty)
+            .toList(),
+        createdAt: DateTime.tryParse(json['CreatedAt']?.toString() ?? '')?.toLocal(),
+        refundedAt: DateTime.tryParse(json['RefundedAt']?.toString() ?? '')?.toLocal(),
+      );
+
+  String get label =>
+      statusLabel ??
+      switch (status) {
+        'APPROVED' => 'Disetujui — Menunggu Pengembalian Dana',
+        'REJECTED' => 'Ditolak',
+        'REFUNDED' => 'Dana Dikembalikan',
+        _ => 'Menunggu Persetujuan Toko',
+      };
+}
 
 /// A physical 3D-print order (`Orders` on the backend, excluding
 /// AI-credit purchases). Distinct from an [AiJobSummary] — an order only
@@ -336,6 +423,16 @@ class PhysicalOrder {
   /// confirm receipt (admin's Selesai Otomatis); null when it won't.
   final DateTime? autoCompleteAt;
 
+  /// Pengembalian on this order (null = none asked).
+  final OrderReturnInfo? returnInfo;
+
+  /// The order detail says "Ajukan Pengembalian" is allowed now (paid, sent,
+  /// within the window after completion, not asked before).
+  final bool canRequestReturn;
+
+  /// Last moment to ask for a return on a completed order (null = no deadline shown).
+  final DateTime? returnDeadline;
+
   /// Discount from a Petope promo (paid by Petope): the one taken once paid,
   /// or — before paying — what the order would get now. 0 = none.
   final int promoDiscountAmount;
@@ -376,6 +473,9 @@ class PhysicalOrder {
     this.statusHistories = const [],
     this.printFiles = const [],
     this.autoCompleteAt,
+    this.returnInfo,
+    this.canRequestReturn = false,
+    this.returnDeadline,
     this.promoDiscountAmount = 0,
     this.promoTitle,
   });
@@ -400,6 +500,9 @@ class PhysicalOrder {
       ratingNotes: json['RatingNotes']?.toString(),
       createdAt: DateTime.tryParse(json['CreatedAt']?.toString() ?? ''),
       autoCompleteAt: DateTime.tryParse(json['AutoCompleteAt']?.toString() ?? '')?.toLocal(),
+      returnInfo: json['Return'] is Map<String, dynamic> ? OrderReturnInfo.fromJson(json['Return'] as Map<String, dynamic>) : null,
+      canRequestReturn: json['CanRequestReturn'] == true,
+      returnDeadline: DateTime.tryParse(json['ReturnDeadline']?.toString() ?? '')?.toLocal(),
       merchant: json['Merchant'] is Map<String, dynamic> ? OrderMerchantInfo.fromJson(json['Merchant'] as Map<String, dynamic>) : null,
       items: (json['Items'] as List<dynamic>? ?? []).map((e) => PhysicalOrderItem.fromJson(e as Map<String, dynamic>)).toList(),
       shippingAddress: json['ShippingAddress'] is Map<String, dynamic>
@@ -424,6 +527,11 @@ class PhysicalOrder {
 
   /// Jasa edit the store priced, summed over the order's designs (0 when none / not yet).
   int get editServiceTotal => items.fold(0, (sum, i) => sum + (i.editServiceFee ?? 0));
+
+  /// Unpaid, priced, and the store set a jasa edit price: the customer agrees
+  /// (checkout) or declines (cancels the order).
+  bool get awaitsEditPriceApproval =>
+      editServiceTotal > 0 && !awaitingMerchantConfirmation && !isPaid && !isCompleted && !isCancelled;
 
   /// Title + picture for a list row, covering all three ways an order is
   /// made: a marketplace product, a customer's own AI design, or a
@@ -484,12 +592,19 @@ class PhysicalOrder {
 
   bool get isCancelled => status?.name.toUpperCase() == 'CANCELLED';
 
-  /// Customer-facing tab this order belongs to (Shopee-style shortcuts on the
-  /// Pesanan screen). Completed orders land in [OrderTab.review] until rated,
-  /// then only appear under the history view.
+  /// In a return: asked (RETURN_REQUESTED) or refunded (RETURNED).
+  bool get isInReturn {
+    final name = status?.name.toUpperCase();
+    return name == 'RETURN_REQUESTED' || name == 'RETURNED';
+  }
+
+  /// The one status tab this order shows under (mirrors classifyOrderTab in
+  /// the backend's OrderController). Completed orders are [OrderTab.review]
+  /// until rated, then [OrderTab.completed].
   OrderTab get tab {
-    if (isCancelled) return OrderTab.history;
-    if (isCompleted) return rating == null ? OrderTab.review : OrderTab.history;
+    if (isInReturn) return OrderTab.returns;
+    if (isCancelled) return OrderTab.cancelled;
+    if (isCompleted) return rating == null ? OrderTab.review : OrderTab.completed;
     if (!isPaid) return OrderTab.unpaid;
     // "Ambil di Toko" is never "Dikirim": it waits under Dikemas (ready = "Siap
     // diambil") until the store marks it collected, which completes it.
@@ -499,5 +614,16 @@ class PhysicalOrder {
       return OrderTab.shipped;
     }
     return OrderTab.packing;
+  }
+
+  /// Readable status for the list card and detail pill.
+  String get statusLabel {
+    if (status?.name.toUpperCase() == 'RETURNED') return 'Dikembalikan';
+    if (isInReturn) return 'Pengembalian';
+    if (awaitingMerchantConfirmation && !isPaid && !isCancelled) return 'Menunggu Konfirmasi';
+    return switch (tab) {
+      OrderTab.review => 'Selesai',
+      final t => t.label,
+    };
   }
 }

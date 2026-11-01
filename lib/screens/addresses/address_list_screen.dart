@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/user_address.dart';
+import '../../providers/active_address_controller.dart';
 import '../../providers/auth_controller.dart';
 import '../../services/auth_service.dart' show ApiException;
 import '../../services/user_address_service.dart';
@@ -45,6 +46,8 @@ class _AddressListScreenState extends State<AddressListScreen> {
       final addresses = await UserAddressService.listMine(token: token);
       if (!mounted) return;
       setState(() => _addresses = addresses);
+      // Keep the home screen's "Dikirim ke …" in step.
+      await context.read<ActiveAddressController>().sync(addresses);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);

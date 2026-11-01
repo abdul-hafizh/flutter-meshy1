@@ -11,6 +11,7 @@ import '../services/ai_job_service.dart';
 import '../services/auth_service.dart' show ApiException;
 import '../theme/app_theme.dart';
 import '../widgets/category_tile.dart';
+import '../widgets/edit_service_option.dart';
 import '../widgets/gradient_button.dart';
 import '../widgets/store_picker.dart';
 import '../widgets/token_balance_badge.dart';
@@ -20,9 +21,6 @@ import 'buy_tokens_screen.dart';
 enum _CreateMode { text, image }
 
 const _kMaxReferenceImages = 4;
-
-/// Largest printable size per side (cm) — a design above it can't be generated.
-const _kMaxDimCm = 25.0;
 
 /// Must match the backend's GENERATION_COST in ai.controller.js.
 const _kGenerationCost = 40;
@@ -94,17 +92,14 @@ class _CreateScreenState extends State<CreateScreen> {
 
   double? _parseDim(String text) => double.tryParse(text.trim().replaceAll(',', '.'));
 
-  bool _overMax(TextEditingController c) => (_parseDim(c.text) ?? 0) > _kMaxDimCm;
-
-  /// A size in cm that can be printed: a number above 0, at most [_kMaxDimCm].
+  /// A size in cm: any number above 0 (no maximum).
   bool _validDim(TextEditingController c) {
     final v = _parseDim(c.text);
-    return v != null && v > 0 && v <= _kMaxDimCm;
+    return v != null && v > 0;
   }
 
-  /// Error under a size field: above the maximum shows right away, empty only after a Generate tap.
+  /// Error under a size field, shown after a Generate tap.
   String? _dimError(TextEditingController c) {
-    if (_overMax(c)) return 'Maks ${_kMaxDimCm.toInt()} cm';
     if (_showDimErrors && !_validDim(c)) return 'Wajib diisi';
     return null;
   }
@@ -113,10 +108,8 @@ class _CreateScreenState extends State<CreateScreen> {
 
   bool get _hasDims => _dimControllers.every(_validDim);
 
-  bool get _anyOverMax => _dimControllers.any(_overMax);
-
   bool get _canGenerate =>
-      _store != null && !_anyOverMax && (_mode == _CreateMode.text ? _hasText : _pickedImages.isNotEmpty);
+      _store != null && (_mode == _CreateMode.text ? _hasText : _pickedImages.isNotEmpty);
 
   Future<void> _pickStore() async {
     final store = await Navigator.of(context).push<NearbyMerchant>(
@@ -150,12 +143,6 @@ class _CreateScreenState extends State<CreateScreen> {
     final store = _store!;
 
     // The size drives the weight estimate, and so the print price.
-    if (_anyOverMax) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ukuran maksimal ${_kMaxDimCm.toInt()} cm untuk panjang, lebar, dan tinggi.')),
-      );
-      return;
-    }
     if (!_hasDims) {
       setState(() => _showDimErrors = true);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -413,7 +400,7 @@ class _CreateScreenState extends State<CreateScreen> {
             const SizedBox(height: 22),
           ],
           Text(
-            isImageMode ? 'Deskripsi Tambahan (opsional)' : 'Deskripsi Produk',
+            isImageMode ? 'Deskripsi Tambahan (opsional)' : 'Buat Prompt',
             style: const TextStyle(
               fontSize: 14.5,
               fontWeight: FontWeight.w700,
@@ -483,19 +470,6 @@ class _CreateScreenState extends State<CreateScreen> {
                   label: 'Tinggi',
                   controller: _heightController,
                   error: _dimError(_heightController),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.info_outline_rounded, size: 15, color: _anyOverMax ? Colors.red : AppColors.textSecondary),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Maksimal ukuran ${_kMaxDimCm.toInt()} cm untuk panjang, lebar, dan tinggi',
-                  style: TextStyle(fontSize: 12, color: _anyOverMax ? Colors.red : AppColors.textSecondary),
                 ),
               ),
             ],
@@ -575,9 +549,11 @@ class _CreateScreenState extends State<CreateScreen> {
             ),
           ],
           const SizedBox(height: 20),
-          _EditServiceOption(
+          EditServiceOption(
             value: _editService,
             onChanged: (v) => setState(() => _editService = v),
+            description: 'Toko akan merapikan/mengedit model 3D sesuai catatanmu. Harga jasa edit ditentukan toko setelah '
+                'checkout — pesanan baru bisa dibayar setelah toko mengisi harganya.',
           ),
                 ],
               ),
@@ -589,70 +565,10 @@ class _CreateScreenState extends State<CreateScreen> {
                 ? 'Membuat desain...'
                 : _store == null
                     ? 'Pilih toko dulu'
-                    : _anyOverMax
-                        ? 'Ukuran maksimal ${_kMaxDimCm.toInt()} cm'
-                        : 'Buat dengan AI ✨',
+                    : 'Buat dengan AI ✨',
             onPressed: _canGenerate && !_generating ? _generate : null,
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Optional "Gunakan jasa edit" — the store edits the 3D model and prices
-/// that work after checkout; the order is paid once the price is in.
-class _EditServiceOption extends StatelessWidget {
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  const _EditServiceOption({required this.value, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: value ? AppColors.purple.withValues(alpha: 0.07) : Colors.transparent,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () => onChanged(!value),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(4, 8, 12, 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: value ? AppColors.purple : AppColors.border),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Checkbox(
-                value: value,
-                activeColor: AppColors.purple,
-                onChanged: (v) => onChanged(v ?? false),
-              ),
-              const Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(top: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Gunakan jasa edit (opsional)',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                      ),
-                      SizedBox(height: 3),
-                      Text(
-                        'Toko akan merapikan/mengedit model 3D sesuai catatanmu. Harga jasa edit ditentukan toko setelah '
-                        'checkout — pesanan baru bisa dibayar setelah toko mengisi harganya.',
-                        style: TextStyle(fontSize: 12, height: 1.35, color: AppColors.textSecondary),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

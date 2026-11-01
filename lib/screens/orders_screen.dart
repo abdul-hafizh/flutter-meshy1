@@ -51,6 +51,10 @@ class OrdersScreenState extends State<OrdersScreen> {
   // so switching tabs re-fetches from page 1 rather than filtering in place.
   OrderTab? _physicalFilter;
 
+  // "Riwayat Pesanan": the full Shopee-style tab strip (Semua … Beri
+  // Penilaian), opened from "Lihat Riwayat Pesanan" or a status shortcut.
+  bool _historyMode = false;
+
   // Badge counts (unpaid/packing/shipped/review/history) — independent of
   // whichever tab's page is currently loaded below.
   Map<OrderTab, int>? _serverCounts;
@@ -59,8 +63,25 @@ class OrdersScreenState extends State<OrdersScreen> {
 
   final _ordersScrollController = ScrollController();
 
-  void _toggleFilter(OrderTab tab) {
-    setState(() => _physicalFilter = _physicalFilter == tab ? null : tab);
+  void _openHistory(OrderTab? tab) {
+    setState(() {
+      _historyMode = true;
+      _physicalFilter = tab;
+    });
+    _loadOrders();
+  }
+
+  void _selectHistoryTab(OrderTab? tab) {
+    if (_physicalFilter == tab) return;
+    setState(() => _physicalFilter = tab);
+    _loadOrders();
+  }
+
+  void _closeHistory() {
+    setState(() {
+      _historyMode = false;
+      _physicalFilter = null;
+    });
     _loadOrders();
   }
 
@@ -109,6 +130,10 @@ class OrdersScreenState extends State<OrdersScreen> {
     }
     if (_mainTab == 'physical' && _selectedOrderId != null) {
       setState(() => _selectedOrderId = null);
+      return true;
+    }
+    if (_mainTab == 'physical' && _historyMode) {
+      _closeHistory();
       return true;
     }
     return false;
@@ -303,28 +328,30 @@ class OrdersScreenState extends State<OrdersScreen> {
           controller: _ordersScrollController,
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           children: [
-            const Text(
-              'Pesanan Saya',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
+            if (!(_mainTab == 'physical' && _historyMode)) ...[
+              const Text(
+                'Pesanan Saya',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Lacak desain AI dan pesanan cetak 3D kamu',
-              style: TextStyle(fontSize: 13.5, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                _MainTab(label: 'Desain AI', active: _mainTab == 'ai', onTap: () => _selectMainTab('ai')),
-                const SizedBox(width: 10),
-                _MainTab(label: 'Pesanan Fisik', active: _mainTab == 'physical', onTap: () => _selectMainTab('physical')),
-              ],
-            ),
-            const SizedBox(height: 18),
+              const SizedBox(height: 4),
+              const Text(
+                'Lacak desain AI dan pesanan cetak 3D kamu',
+                style: TextStyle(fontSize: 13.5, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  _MainTab(label: 'Desain AI', active: _mainTab == 'ai', onTap: () => _selectMainTab('ai')),
+                  const SizedBox(width: 10),
+                  _MainTab(label: 'Pesanan Fisik', active: _mainTab == 'physical', onTap: () => _selectMainTab('physical')),
+                ],
+              ),
+              const SizedBox(height: 18),
+            ],
             if (_mainTab == 'ai') ...[
               Row(
                 children: [
@@ -360,69 +387,103 @@ class OrdersScreenState extends State<OrdersScreen> {
                   if (job != filtered.last) const SizedBox(height: 12),
                 ],
             ] else ...[
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Status Pesanan',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+              if (_historyMode) ...[
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: _closeHistory,
+                      icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
                     ),
-                  ),
-                  InkWell(
-                    onTap: () => _toggleFilter(OrderTab.history),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Text(
-                            'Lihat Riwayat Pesanan',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: _physicalFilter == OrderTab.history ? AppColors.purple : AppColors.textSecondary,
-                            ),
-                          ),
-                          const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textFaint),
-                        ],
+                    const Expanded(
+                      child: Text(
+                        'Riwayat Pesanan',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                       ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final tab in <OrderTab?>[null, ...OrderTab.values]) ...[
+                        _OrderTab(
+                          label: tab == null
+                              ? 'Semua'
+                              : (_countFor(tab) > 0 && tab != OrderTab.completed && tab != OrderTab.cancelled
+                                  ? '${tab.label} (${_countFor(tab)})'
+                                  : tab.label),
+                          active: _physicalFilter == tab,
+                          onTap: () => _selectHistoryTab(tab),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                    ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _StatusShortcut(
-                    icon: Icons.account_balance_wallet_outlined,
-                    label: 'Belum Bayar',
-                    count: _countFor(OrderTab.unpaid),
-                    active: _physicalFilter == OrderTab.unpaid,
-                    onTap: () => _toggleFilter(OrderTab.unpaid),
-                  ),
-                  _StatusShortcut(
-                    icon: Icons.inventory_2_outlined,
-                    label: 'Dikemas',
-                    count: _countFor(OrderTab.packing),
-                    active: _physicalFilter == OrderTab.packing,
-                    onTap: () => _toggleFilter(OrderTab.packing),
-                  ),
-                  _StatusShortcut(
-                    icon: Icons.local_shipping_outlined,
-                    label: 'Dikirim',
-                    count: _countFor(OrderTab.shipped),
-                    active: _physicalFilter == OrderTab.shipped,
-                    onTap: () => _toggleFilter(OrderTab.shipped),
-                  ),
-                  _StatusShortcut(
-                    icon: Icons.star_border_rounded,
-                    label: 'Beri Penilaian',
-                    count: _countFor(OrderTab.review),
-                    active: _physicalFilter == OrderTab.review,
-                    onTap: () => _toggleFilter(OrderTab.review),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
+                ),
+                const SizedBox(height: 18),
+              ] else ...[
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Status Pesanan',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () => _openHistory(null),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Text(
+                              'Lihat Riwayat Pesanan',
+                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+                            ),
+                            Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textFaint),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _StatusShortcut(
+                      icon: Icons.account_balance_wallet_outlined,
+                      label: 'Belum Bayar',
+                      count: _countFor(OrderTab.unpaid),
+                      active: false,
+                      onTap: () => _openHistory(OrderTab.unpaid),
+                    ),
+                    _StatusShortcut(
+                      icon: Icons.inventory_2_outlined,
+                      label: 'Dikemas',
+                      count: _countFor(OrderTab.packing),
+                      active: false,
+                      onTap: () => _openHistory(OrderTab.packing),
+                    ),
+                    _StatusShortcut(
+                      icon: Icons.local_shipping_outlined,
+                      label: 'Dikirim',
+                      count: _countFor(OrderTab.shipped),
+                      active: false,
+                      onTap: () => _openHistory(OrderTab.shipped),
+                    ),
+                    _StatusShortcut(
+                      icon: Icons.star_border_rounded,
+                      label: 'Beri Penilaian',
+                      count: _countFor(OrderTab.review),
+                      active: false,
+                      onTap: () => _openHistory(OrderTab.review),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+              ],
               if (_ordersLoading)
                 const Padding(
                   padding: EdgeInsets.only(top: 40),
@@ -671,7 +732,7 @@ class _PhysicalOrderCard extends StatelessWidget {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              status.name,
+                              order.statusLabel,
                               style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.purple),
                             ),
                           ),

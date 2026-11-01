@@ -6,6 +6,7 @@ import '../providers/chat_controller.dart';
 import '../services/tier_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_version_text.dart';
+import '../widgets/avatar_photo_picker.dart';
 import 'addresses/address_list_screen.dart';
 import 'edit_profile_screen.dart';
 
@@ -19,6 +20,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   /// Tiers from the admin's Master Tier; the built-in list until it loads.
   List<LoyaltyTier> _tiers = kLoyaltyTiers;
+  bool _uploadingPhoto = false;
 
   Future<void> _loadTiers() async {
     final token = context.read<AuthController>().token;
@@ -141,41 +143,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Center(
             child: Column(
               children: [
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      width: 84,
-                      height: 84,
-                      clipBehavior: Clip.antiAlias,
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceMuted,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.border, width: 2),
-                      ),
-                      child: user?.avatarUrl != null
-                          ? Image.network(
-                              user!.avatarUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => const Icon(Icons.person_rounded, size: 42, color: AppColors.textFaint),
-                            )
-                          : const Icon(Icons.person_rounded, size: 42, color: AppColors.textFaint),
-                    ),
-                    Positioned(
-                      bottom: -2,
-                      right: -2,
-                      child: Container(
-                        width: 30,
-                        height: 30,
+                GestureDetector(
+                  onTap: _uploadingPhoto
+                      ? null
+                      : () => pickAndUploadAvatar(context, onUploading: (v) => setState(() => _uploadingPhoto = v)),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 84,
+                        height: 84,
+                        clipBehavior: Clip.antiAlias,
                         decoration: BoxDecoration(
-                          gradient: AppColors.brandGradient,
+                          color: AppColors.surfaceMuted,
                           shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.surface, width: 3),
+                          border: Border.all(color: AppColors.border, width: 2),
                         ),
-                        child: Icon(currentTier.icon, size: 14, color: Colors.white),
+                        child: _uploadingPhoto
+                            ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                            : user?.avatarUrl != null
+                            ? Image.network(
+                                user!.avatarUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => const Icon(Icons.person_rounded, size: 42, color: AppColors.textFaint),
+                              )
+                            : const Icon(Icons.person_rounded, size: 42, color: AppColors.textFaint),
                       ),
-                    ),
-                  ],
+                      Positioned(
+                        bottom: -2,
+                        left: -2,
+                        child: Container(
+                          width: 26,
+                          height: 26,
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: const Icon(Icons.photo_camera_rounded, size: 13, color: AppColors.textSecondary),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: -2,
+                        right: -2,
+                        child: Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            gradient: AppColors.brandGradient,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.surface, width: 3),
+                          ),
+                          child: Icon(currentTier.icon, size: 14, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(

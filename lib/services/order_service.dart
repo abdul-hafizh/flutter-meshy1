@@ -44,9 +44,9 @@ class OrderService {
     return list.map((e) => PhysicalOrder.fromJson(e as Map<String, dynamic>)).toList();
   }
 
-  /// Paginated orders, optionally scoped to one of the Pesanan Saya tabs
-  /// ('unpaid' | 'packing' | 'shipped' | 'review' | 'history' — matches
-  /// [OrderTab.name]). The backend computes tab membership itself (payment,
+  /// Paginated orders, optionally scoped to one of the Riwayat Pesanan tabs
+  /// ([OrderTab.name]: unpaid, packing, shipped, completed, returns,
+  /// cancelled, review). The backend computes tab membership itself (payment,
   /// shipment and rating state), so pagination stays correct instead of
   /// client-side filtering a fixed-size fetched list.
   static Future<PhysicalOrderPage> listMinePaged({
@@ -74,8 +74,8 @@ class OrderService {
     );
   }
 
-  /// Per-tab badge counts (unpaid/packing/shipped/review/history), computed
-  /// server-side so they stay correct beyond the first page of orders.
+  /// Per-tab counts (one per [OrderTab]), computed server-side so they stay
+  /// correct beyond the first page of orders.
   static Future<Map<OrderTab, int>> counts({required String token}) async {
     http.Response res;
     try {
@@ -85,13 +85,7 @@ class OrderService {
     }
     final data = decodeApiResponse(res)['data'] as Map<String, dynamic>? ?? {};
     int n(String k) => data[k] is int ? data[k] as int : int.tryParse('${data[k]}') ?? 0;
-    return {
-      OrderTab.unpaid: n('unpaid'),
-      OrderTab.packing: n('packing'),
-      OrderTab.shipped: n('shipped'),
-      OrderTab.review: n('review'),
-      OrderTab.history: n('history'),
-    };
+    return {for (final tab in OrderTab.values) tab: n(tab.name)};
   }
 
   /// Cancels an unpaid order (the backend refuses once it's been paid).

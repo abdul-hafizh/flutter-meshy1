@@ -42,6 +42,7 @@ class PrintFileService {
     String? materialName,
     int quantity = 1,
     String? notes,
+    bool editService = false,
   }) async {
     http.Response res;
     try {
@@ -57,6 +58,7 @@ class PrintFileService {
         ));
       if (materialName != null && materialName.isNotEmpty) request.fields['MaterialName'] = materialName;
       if (notes != null && notes.trim().isNotEmpty) request.fields['Notes'] = notes.trim();
+      if (editService) request.fields['EditService'] = 'true';
       final streamed = await request.send().timeout(const Duration(minutes: 3));
       res = await http.Response.fromStream(streamed);
     } catch (_) {

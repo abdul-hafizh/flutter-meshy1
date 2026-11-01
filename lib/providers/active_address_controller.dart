@@ -36,6 +36,16 @@ class ActiveAddressController extends ChangeNotifier {
     }
   }
 
+  /// Takes a freshly fetched list (e.g. from "Alamat Saya" in the profile)
+  /// so the home screen shows a new or edited address right away.
+  Future<void> sync(List<UserAddress> list) async {
+    final prefs = await SharedPreferences.getInstance();
+    addresses = list;
+    address = _pick(list, prefs.getString(_prefsKey));
+    loaded = true;
+    notifyListeners();
+  }
+
   static UserAddress? _pick(List<UserAddress> list, String? savedId) {
     if (list.isEmpty) return null;
     for (final a in list) {

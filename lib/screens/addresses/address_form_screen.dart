@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/region.dart';
 import '../../models/user_address.dart';
+import '../../providers/active_address_controller.dart';
 import '../../providers/auth_controller.dart';
 import '../../services/auth_service.dart' show ApiException;
 import '../../services/location_service.dart';
@@ -29,7 +30,6 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
   late final TextEditingController _labelCtrl;
   late final TextEditingController _recipientCtrl;
   late final TextEditingController _phoneCtrl;
-  late final TextEditingController _whatsappCtrl;
   late final TextEditingController _addressCtrl;
   late final TextEditingController _postalCodeCtrl;
   late bool _isDefault;
@@ -59,8 +59,9 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     final existing = widget.existing;
     _labelCtrl = TextEditingController(text: existing?.label ?? '');
     _recipientCtrl = TextEditingController(text: existing?.recipientName ?? '');
-    _phoneCtrl = TextEditingController(text: existing?.phone ?? '');
-    _whatsappCtrl = TextEditingController(text: existing?.whatsappNumber ?? '');
+    // One number (No HP); older addresses may only have the WhatsApp one filled in.
+    final phone = existing?.phone ?? '';
+    _phoneCtrl = TextEditingController(text: phone.isNotEmpty ? phone : (existing?.whatsappNumber ?? ''));
     _addressCtrl = TextEditingController(text: existing?.address ?? '');
     _postalCodeCtrl = TextEditingController(text: existing?.postalCode ?? '');
     _isDefault = existing?.isDefault ?? false;
@@ -79,7 +80,6 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     _labelCtrl.dispose();
     _recipientCtrl.dispose();
     _phoneCtrl.dispose();
-    _whatsappCtrl.dispose();
     _addressCtrl.dispose();
     _postalCodeCtrl.dispose();
     super.dispose();
@@ -405,7 +405,8 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
           label: _labelCtrl.text.trim().isEmpty ? 'Rumah' : _labelCtrl.text.trim(),
           recipientName: _recipientCtrl.text.trim(),
           phone: _phoneCtrl.text.trim(),
-          whatsappNumber: _whatsappCtrl.text.trim(),
+          // The same number is their WhatsApp.
+          whatsappNumber: _phoneCtrl.text.trim(),
           address: _addressCtrl.text.trim(),
           countryId: _countryId,
           provinceId: _provinceId,
@@ -425,7 +426,8 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
           label: _labelCtrl.text.trim().isEmpty ? 'Rumah' : _labelCtrl.text.trim(),
           recipientName: _recipientCtrl.text.trim(),
           phone: _phoneCtrl.text.trim(),
-          whatsappNumber: _whatsappCtrl.text.trim(),
+          // The same number is their WhatsApp.
+          whatsappNumber: _phoneCtrl.text.trim(),
           address: _addressCtrl.text.trim(),
           countryId: _countryId,
           provinceId: _provinceId,
@@ -439,6 +441,9 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
           isDefault: _isDefault,
         );
       }
+      if (!mounted) return;
+      // The home screen shows the address straight away, wherever the form was opened from.
+      await context.read<ActiveAddressController>().load(token);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {
@@ -492,14 +497,8 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
               TextFormField(
                 controller: _phoneCtrl,
                 keyboardType: TextInputType.phone,
-                decoration: _decoration('Nomor telepon'),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Nomor telepon wajib diisi' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _whatsappCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: _decoration('Nomor WhatsApp (opsional)'),
+                decoration: _decoration('No HP', hint: '08xxxxxxxxxx'),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'No HP wajib diisi' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(

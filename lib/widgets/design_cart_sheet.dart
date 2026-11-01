@@ -273,15 +273,12 @@ class _MaterialTile extends StatelessWidget {
                   size: 20,
                 ),
                 const SizedBox(width: 10),
+                // No per-material price here — the customer sees the total below.
                 Expanded(
                   child: Text(
                     option.name,
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                   ),
-                ),
-                Text(
-                  rupiahLabel(TaxConfig.withPpn(option.unitPrice)),
-                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.orangeDeep),
                 ),
               ],
             ),
