@@ -1299,6 +1299,13 @@ class _ActionArea extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Beri Penilaian', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                if (order.autoRatingAt != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Beri penilaian sebelum ${_autoCompleteDate(order.autoRatingAt!)}. Setelah itu sistem memberi penilaian otomatis.',
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.35),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -1361,6 +1368,13 @@ class _ActionArea extends StatelessWidget {
             Text(
               order.ratingNotes!.trim(),
               style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+          ],
+          if (order.autoRated) ...[
+            const SizedBox(height: 4),
+            const Text(
+              'Penilaian otomatis oleh sistem karena pesanan tidak dinilai dalam batas waktu.',
+              style: TextStyle(fontSize: 11.5, color: AppColors.textFaint),
             ),
           ],
         ],

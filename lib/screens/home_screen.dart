@@ -31,9 +31,13 @@ class HomeScreen extends StatefulWidget {
 
 class HomeScreenState extends State<HomeScreen> {
   /// Called when the Home tab is opened again — refreshes "Produk Siap Checkout".
-  Future<void> reload() => _loadProducts();
+  Future<void> reload() async {
+    _startKey.currentState?.reload();
+    await _loadProducts();
+  }
 
   List<Product>? _readyProducts;
+  final _startKey = GlobalKey<StartOptionsState>();
   bool _loadingProducts = true;
   String? _loadError;
 
@@ -151,8 +155,8 @@ class HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 16),
           const DeliveryAddressBar(),
           const SizedBox(height: 18),
-          // Three ways to order: market, AI prompt, or a ready-to-print file via a store's chat.
-          StartOptions(onReadyMade: widget.onSeeAllTap, onPrompt: widget.onCreateTap),
+          // Ways to order (cards from Master Kategori Produk): market, AI prompt, or a ready-to-print file via a store's chat.
+          StartOptions(key: _startKey, onReadyMade: widget.onSeeAllTap, onPrompt: widget.onCreateTap),
           const SizedBox(height: 26),
           const NearbyStoresSection(),
           const SizedBox(height: 26),

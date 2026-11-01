@@ -407,6 +407,12 @@ class PhysicalOrder {
   final bool awaitingMerchantConfirmation;
   final int? rating;
   final String? ratingNotes;
+
+  /// [rating] was given by the system (Rating Otomatis), not the customer.
+  final bool autoRated;
+
+  /// When the system rates this order if the customer hasn't (admin's Rating Otomatis); null when it won't.
+  final DateTime? autoRatingAt;
   final DateTime? createdAt;
   final OrderMerchantInfo? merchant;
   final List<PhysicalOrderItem> items;
@@ -464,6 +470,8 @@ class PhysicalOrder {
     this.awaitingMerchantConfirmation = false,
     this.rating,
     this.ratingNotes,
+    this.autoRated = false,
+    this.autoRatingAt,
     this.createdAt,
     this.merchant,
     this.items = const [],
@@ -498,6 +506,8 @@ class PhysicalOrder {
       awaitingMerchantConfirmation: json['AwaitingMerchantConfirmation'] == true || json['AwaitingMerchantConfirmation'] == 1,
       rating: json['Rating'] is int ? json['Rating'] as int : int.tryParse('${json['Rating']}'),
       ratingNotes: json['RatingNotes']?.toString(),
+      autoRated: json['AutoRated'] == true || json['AutoRated'] == 1,
+      autoRatingAt: DateTime.tryParse(json['AutoRatingAt']?.toString() ?? '')?.toLocal(),
       createdAt: DateTime.tryParse(json['CreatedAt']?.toString() ?? ''),
       autoCompleteAt: DateTime.tryParse(json['AutoCompleteAt']?.toString() ?? '')?.toLocal(),
       returnInfo: json['Return'] is Map<String, dynamic> ? OrderReturnInfo.fromJson(json['Return'] as Map<String, dynamic>) : null,
