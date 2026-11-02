@@ -365,12 +365,16 @@ class OrderPrintFile {
   final String? materialName;
   final int quantity;
 
+  /// Gambar referensi sent with the file (GET /print-files/:id/images/:imageId).
+  final List<String> imageIds;
+
   const OrderPrintFile({
     required this.id,
     required this.fileName,
     required this.fileSize,
     this.materialName,
     this.quantity = 1,
+    this.imageIds = const [],
   });
 
   factory OrderPrintFile.fromJson(Map<String, dynamic> json) {
@@ -381,6 +385,11 @@ class OrderPrintFile {
       fileSize: toInt(json['FileSize'], 0),
       materialName: json['MaterialName']?.toString(),
       quantity: toInt(json['Quantity'], 1),
+      imageIds: (json['Images'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map((e) => e['Id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toList(),
     );
   }
 

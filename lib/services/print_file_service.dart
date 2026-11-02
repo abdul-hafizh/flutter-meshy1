@@ -6,6 +6,14 @@ import 'package:http_parser/http_parser.dart';
 import 'api_client.dart';
 import 'api_config.dart';
 
+/// A reference photo picked to send with a print file.
+class ReferenceImage {
+  final Uint8List bytes;
+  final String fileName;
+
+  const ReferenceImage({required this.bytes, required this.fileName});
+}
+
 /// Ready-to-print files (STL/OBJ/3MF/STEP) a customer sends a store from the
 /// chat. Uploaded to Petope's own server (`/print-files`), which also posts
 /// the file card into the chat; the store then makes the order manually.
@@ -14,6 +22,12 @@ class PrintFileService {
 
   static const allowedExtensions = ['stl', 'obj', '3mf', 'step', 'stp'];
   static const maxBytes = 50 * 1024 * 1024;
+
+  /// Gambar referensi per file (the backend's limit).
+  static const maxImages = 5;
+
+  /// A reference photo (needs the Bearer token).
+  static String imageUrl(String printFileId, String imageId) => '${ApiConfig.baseUrl}/print-files/$printFileId/images/$imageId';
 
   static Uri _uri(String path) => Uri.parse('${ApiConfig.baseUrl}$path');
 
@@ -43,6 +57,7 @@ class PrintFileService {
     int quantity = 1,
     String? notes,
     bool editService = false,
+    List<ReferenceImage> images = const [],
   }) async {
     http.Response res;
     try {
@@ -59,6 +74,11 @@ class PrintFileService {
       if (materialName != null && materialName.isNotEmpty) request.fields['MaterialName'] = materialName;
       if (notes != null && notes.trim().isNotEmpty) request.fields['Notes'] = notes.trim();
       if (editService) request.fields['EditService'] = 'true';
+      for (final img in images) {
+        final ext = img.fileName.toLowerCase().split('.').last;
+        final subtype = ext == 'png' ? 'png' : (ext == 'webp' ? 'webp' : 'jpeg');
+        request.files.add(http.MultipartFile.fromBytes('images', img.bytes, filename: img.fileName, contentType: MediaType('image', subtype)));
+      }
       final streamed = await request.send().timeout(const Duration(minutes: 3));
       res = await http.Response.fromStream(streamed);
     } catch (_) {

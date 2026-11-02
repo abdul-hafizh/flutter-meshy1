@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 
@@ -13,7 +14,7 @@ import '../edit_service_option.dart';
 import '../gradient_button.dart';
 
 /// "Kirim File Cetak": the customer picks a ready-to-print file (STL, OBJ,
-/// 3MF, STEP), a material and quantity, and sends it to the store in this
+/// 3MF, STEP), optional reference photos, a material and quantity, and sends it to the store in this
 /// chat. The file goes to Petope's server (not the chat provider); the
 /// store creates the order for it in its dashboard. [fileName]/[bytes]
 /// pre-fill the file (a file shared to Petope). Resolves to true once sent.
@@ -49,6 +50,7 @@ class _PrintFileSheetState extends State<_PrintFileSheet> {
   Uint8List? _bytes;
   bool _picking = false;
   bool _sending = false;
+  final List<ReferenceImage> _images = [];
 
   @override
   void initState() {
@@ -109,6 +111,46 @@ class _PrintFileSheetState extends State<_PrintFileSheet> {
     }
   }
 
+  Future<void> _addImages() async {
+    final room = PrintFileService.maxImages - _images.length;
+    if (room <= 0) return;
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Ambil foto'),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Pilih dari galeri'),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+    try {
+      final picker = ImagePicker();
+      final picked = source == ImageSource.camera
+          ? [?await picker.pickImage(source: source, imageQuality: 85, maxWidth: 1600, maxHeight: 1600)]
+          : await picker.pickMultiImage(imageQuality: 85, maxWidth: 1600, maxHeight: 1600, limit: room > 1 ? room : null);
+      final added = <ReferenceImage>[];
+      for (final file in picked.take(room)) {
+        final name = file.name.contains('.') ? file.name : '${file.name}.jpg';
+        added.add(ReferenceImage(bytes: await file.readAsBytes(), fileName: name));
+      }
+      if (mounted && added.isNotEmpty) setState(() => _images.addAll(added));
+    } catch (_) {
+      _toast('Gagal membuka gambar.');
+    }
+  }
+
   Future<void> _send() async {
     final token = context.read<AuthController>().token;
     final bytes = _bytes;
@@ -125,6 +167,7 @@ class _PrintFileSheetState extends State<_PrintFileSheet> {
         quantity: _quantity,
         notes: _notes.text,
         editService: _editService,
+        images: _images,
       );
       if (!mounted) return;
       _toast(message);
@@ -172,6 +215,67 @@ class _PrintFileSheetState extends State<_PrintFileSheet> {
                 padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Gambar Referensi (opsional, maks. ${PrintFileService.maxImages})',
+              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+            ),
+            const SizedBox(height: 2),
+            const Text(
+              'Foto contoh hasil, warna, atau detail yang kamu mau — membantu toko memahami pesananmu.',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final (i, img) in _images.indexed)
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.memory(img.bytes, width: 72, height: 72, fit: BoxFit.cover),
+                      ),
+                      Positioned(
+                        top: -6,
+                        right: -6,
+                        child: GestureDetector(
+                          onTap: _sending ? null : () => setState(() => _images.removeAt(i)),
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: const BoxDecoration(color: Colors.black87, shape: BoxShape.circle),
+                            child: const Icon(Icons.close_rounded, size: 14, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                if (_images.length < PrintFileService.maxImages)
+                  InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: _sending ? null : _addImages,
+                    child: Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceMuted,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_photo_alternate_outlined, color: AppColors.purple),
+                          SizedBox(height: 2),
+                          Text('Tambah', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 14),
             const Text('Bahan', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
@@ -277,6 +381,9 @@ class _PrintFileCard extends StatelessWidget {
     final qty = data['quantity']?.toString() ?? '1';
     final notes = data['notes']?.toString();
     final editService = data['editServiceRequested'] == true;
+    final printFileId = data['printFileId']?.toString();
+    final imageIds = (data['imageIds'] as List<dynamic>? ?? []).map((e) => e.toString()).toList();
+    final token = context.read<AuthController>().token;
     return Container(
       width: 260,
       margin: const EdgeInsets.all(4),
@@ -331,11 +438,73 @@ class _PrintFileCard extends StatelessWidget {
                       style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.orange),
                     ),
                   ),
+                if (printFileId != null && imageIds.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  ReferenceImageStrip(printFileId: printFileId, imageIds: imageIds, token: token, size: 44),
+                ],
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Thumbnails of a print file's reference photos (tap to view full size).
+class ReferenceImageStrip extends StatelessWidget {
+  final String printFileId;
+  final List<String> imageIds;
+  final String? token;
+  final double size;
+
+  const ReferenceImageStrip({super.key, required this.printFileId, required this.imageIds, required this.token, this.size = 56});
+
+  Widget _image(String id, {BoxFit fit = BoxFit.cover, double? side}) => Image.network(
+        PrintFileService.imageUrl(printFileId, id),
+        headers: token != null ? {'Authorization': 'Bearer $token'} : null,
+        width: side,
+        height: side,
+        fit: fit,
+        errorBuilder: (_, _, _) => SizedBox(
+          width: side,
+          height: side,
+          child: const Center(child: Icon(Icons.broken_image_outlined, color: AppColors.textFaint)),
+        ),
+      );
+
+  void _open(BuildContext context, String id) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            InteractiveViewer(child: _image(id, fit: BoxFit.contain)),
+            Positioned(
+              top: 4,
+              right: 4,
+              child: IconButton(onPressed: () => Navigator.of(ctx).pop(), icon: const Icon(Icons.close_rounded)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (final id in imageIds)
+          GestureDetector(
+            onTap: () => _open(context, id),
+            child: ClipRRect(borderRadius: BorderRadius.circular(8), child: _image(id, side: size)),
+          ),
+      ],
     );
   }
 }

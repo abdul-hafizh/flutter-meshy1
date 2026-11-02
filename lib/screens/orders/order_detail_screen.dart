@@ -17,6 +17,7 @@ import '../../services/order_service.dart';
 import '../../services/shipment_tracking_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/checkout/shipping_widgets.dart' show rupiahLabel;
+import '../../widgets/chat/print_file_sheet.dart' show ReferenceImageStrip;
 import '../../widgets/gradient_button.dart';
 import '../../widgets/store_picker.dart' show StoreSummaryTile;
 import '../../widgets/store_status.dart';
@@ -683,6 +684,15 @@ class _PrintFilesCard extends StatelessWidget {
                           [f.sizeLabel, if (f.materialName != null) 'Bahan ${f.materialName}', '${f.quantity} pcs'].join(' · '),
                           style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
                         ),
+                        if (f.imageIds.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          ReferenceImageStrip(
+                            printFileId: f.id,
+                            imageIds: f.imageIds,
+                            token: context.read<AuthController>().token,
+                            size: 48,
+                          ),
+                        ],
                       ],
                     ),
                   ),

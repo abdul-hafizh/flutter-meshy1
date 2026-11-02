@@ -33,10 +33,10 @@ class CreateScreen extends StatefulWidget {
   const CreateScreen({super.key, this.onCreated});
 
   @override
-  State<CreateScreen> createState() => _CreateScreenState();
+  State<CreateScreen> createState() => CreateScreenState();
 }
 
-class _CreateScreenState extends State<CreateScreen> {
+class CreateScreenState extends State<CreateScreen> {
   final TextEditingController _controller = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
   final TextEditingController _lengthController = TextEditingController();
@@ -129,6 +129,32 @@ class _CreateScreenState extends State<CreateScreen> {
       _pickedImages.addAll(files);
       _pickedImageBytesList.addAll(bytesList);
     });
+  }
+
+  /// A photo shared to Petope from the gallery ("Bagikan ke Petope"): switches
+  /// to Produk via gambar and adds it as a reference photo. Returns false when
+  /// the reference photos are already full.
+  Future<bool> addSharedImage({required String path, required String name}) async {
+    if (_pickedImages.length >= _kMaxReferenceImages) {
+      setState(() => _mode = _CreateMode.image);
+      return false;
+    }
+    final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+    final mime = switch (ext) {
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      'heic' || 'heif' => 'image/heic',
+      _ => 'image/jpeg',
+    };
+    final file = XFile(path, name: name, mimeType: mime);
+    final bytes = await file.readAsBytes();
+    if (!mounted) return false;
+    setState(() {
+      _mode = _CreateMode.image;
+      _pickedImages.add(file);
+      _pickedImageBytesList.add(bytes);
+    });
+    return true;
   }
 
   void _removeImageAt(int index) {

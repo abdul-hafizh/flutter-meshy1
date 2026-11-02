@@ -11,6 +11,7 @@ import '../../services/order_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/chat/link_attachment_builders.dart';
 import '../../widgets/chat/print_file_sheet.dart';
+import '../../widgets/chat/quote_card.dart';
 
 String _rupiah(int v) {
   final s = v.toString();
@@ -22,6 +23,10 @@ String _rupiah(int v) {
   }
   return 'Rp $buf';
 }
+
+/// The "Kirim Pesanan" header button (share an order link) is hidden for now;
+/// set to true to bring it back.
+const _kShowShareOrder = false;
 
 /// Pushed as a normal route (unlike most of this app's tabs, which swap
 /// content inline) since it's a focused, full-screen task with its own
@@ -125,16 +130,17 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           IconButton(
             onPressed: _sendPrintFile,
-            tooltip: 'Kirim File Cetak',
-            icon: const Icon(Icons.view_in_ar_outlined),
+            tooltip: 'Kirim File Siap Print',
+            icon: const Icon(Icons.upload_file_rounded),
           ),
-          IconButton(
-            onPressed: _sendingOrderLink ? null : _shareOrder,
-            tooltip: 'Kirim Pesanan',
-            icon: _sendingOrderLink
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.receipt_long_outlined),
-          ),
+          if (_kShowShareOrder)
+            IconButton(
+              onPressed: _sendingOrderLink ? null : _shareOrder,
+              tooltip: 'Kirim Pesanan',
+              icon: _sendingOrderLink
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.receipt_long_outlined),
+            ),
         ],
       ),
     );
@@ -160,6 +166,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ProductLinkAttachmentBuilder(),
           OrderLinkAttachmentBuilder(),
           PrintFileAttachmentBuilder(),
+          QuoteAttachmentBuilder(),
         ],
       ),
       child: StreamChannel(

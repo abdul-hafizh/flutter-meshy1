@@ -21,6 +21,9 @@ import 'market_screen.dart';
 import 'orders_screen.dart';
 import 'profile_screen.dart';
 
+/// Photos shared to Petope go to the prompt screen (Produk via gambar).
+const _kSharedImageExtensions = {'jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'};
+
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -33,6 +36,7 @@ class _MainShellState extends State<MainShell> {
   final _homeKey = GlobalKey<HomeScreenState>();
   final _marketKey = GlobalKey<MarketScreenState>();
   final _ordersKey = GlobalKey<OrdersScreenState>();
+  final _createKey = GlobalKey<CreateScreenState>();
 
   @override
   void initState() {
@@ -59,9 +63,10 @@ class _MainShellState extends State<MainShell> {
 
   void _toast(String message) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 
-  /// A 3D file shared from another app (e.g. a WhatsApp document): pick the
-  /// store first, then fill in material/quantity/notes and send it to that
-  /// store's chat — which then opens.
+  /// A file shared from another app. A photo (e.g. from the gallery) goes to
+  /// the prompt screen as a reference photo for Produk via gambar. A 3D file
+  /// (e.g. a WhatsApp document): pick the store first, then fill in
+  /// material/quantity/notes and send it to that store's chat — which then opens.
   Future<void> _onSharedFile() async {
     final file = SharedFileService.pending.value;
     if (file == null || _handlingShare || !mounted) return;
@@ -76,8 +81,19 @@ class _MainShellState extends State<MainShell> {
         _toast('File yang dibagikan tidak bisa dibuka.');
         return;
       }
+      if (_kSharedImageExtensions.contains(file.extension)) {
+        _goTo(1);
+        // The prompt tab is built once the shell shows it.
+        await WidgetsBinding.instance.endOfFrame;
+        final added = await _createKey.currentState?.addSharedImage(path: file.path!, name: file.name);
+        if (!mounted) return;
+        _toast(added == true
+            ? 'Gambar ditambahkan ke Foto Referensi. Pilih toko & lengkapi detailnya, lalu buat desain.'
+            : 'Foto Referensi sudah penuh (maks. 4). Hapus salah satu untuk menambah gambar ini.');
+        return;
+      }
       if (!PrintFileService.allowedExtensions.contains(file.extension)) {
-        _toast('Petope hanya menerima file STL, OBJ, 3MF, atau STEP.');
+        _toast('Petope menerima gambar (JPG, PNG, WEBP, HEIC) atau file STL, OBJ, 3MF, STEP.');
         return;
       }
       final store = await Navigator.of(context).push<NearbyMerchant>(
@@ -115,7 +131,7 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final screens = [
       HomeScreen(key: _homeKey, onCreateTap: () => _goTo(1), onSeeAllTap: () => _goTo(2)),
-      CreateScreen(onCreated: () => _goTo(3)),
+      CreateScreen(key: _createKey, onCreated: () => _goTo(3)),
       MarketScreen(key: _marketKey),
       OrdersScreen(key: _ordersKey),
       const ProfileScreen(),

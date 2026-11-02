@@ -484,6 +484,29 @@ class _CartLineTile extends StatelessWidget {
                     style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                   ),
                   const SizedBox(height: 4),
+                  if (line.quote != null) ...[
+                    Text(
+                      [
+                        'Penawaran ${line.quote!.quoteNumber}',
+                        if (line.quote!.materialName != null) 'Bahan ${line.quote!.materialName}',
+                        '${line.quantity} pcs',
+                      ].join(' · '),
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                    if (line.quote!.fileNames.isNotEmpty)
+                      Text(
+                        line.quote!.fileNames.join(', '),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                    if (line.quote!.editServiceFee > 0)
+                      Text(
+                        '+ Jasa edit ${rupiahLabel(TaxConfig.withPpn(line.quote!.editServiceFee))}',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.orangeDeep),
+                      ),
+                    const SizedBox(height: 4),
+                  ],
                   if (design != null) ...[
                     const SizedBox(height: 2),
                     Text(
@@ -531,7 +554,8 @@ class _CartLineTile extends StatelessWidget {
                   ],
                   const SizedBox(height: 2),
                   Text(
-                    rupiahLabel(TaxConfig.withPpn(line.unitPrice)),
+                    // A penawaran's price is the store's total for it.
+                    rupiahLabel(TaxConfig.withPpn(line.isQuote ? line.lineTotal : line.unitPrice)),
                     style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.orangeDeep),
                   ),
                   if (line.issue != null) ...[
@@ -552,6 +576,7 @@ class _CartLineTile extends StatelessWidget {
                         tooltip: 'Hapus',
                       ),
                       const Spacer(),
+                      // A penawaran's quantity is the store's.
                       if (line.product != null || design != null)
                         _Stepper(
                           quantity: line.quantity,

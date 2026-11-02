@@ -69,7 +69,39 @@ class CartDesign {
   }
 }
 
-/// One line of the cart — a marketplace [product] or an AI [design]. [issue]
+/// A store's penawaran from Pesanan Custom the customer agreed to in the
+/// chat: price, quantity and jasa edit are the store's (fixed in the cart).
+class CartQuote {
+  final String id;
+  final String quoteNumber;
+  final String name;
+  final String? materialName;
+  final String? colorType;
+  final int editServiceFee;
+  final List<String> fileNames;
+
+  const CartQuote({
+    required this.id,
+    required this.quoteNumber,
+    required this.name,
+    this.materialName,
+    this.colorType,
+    this.editServiceFee = 0,
+    this.fileNames = const [],
+  });
+
+  factory CartQuote.fromJson(Map<String, dynamic> json) => CartQuote(
+        id: json['Id']?.toString() ?? '',
+        quoteNumber: json['QuoteNumber']?.toString() ?? '',
+        name: json['Name']?.toString() ?? 'File Siap Print',
+        materialName: json['MaterialName']?.toString(),
+        colorType: json['ColorType']?.toString(),
+        editServiceFee: _asInt(json['EditServiceFee']),
+        fileNames: (json['FileNames'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
+      );
+}
+
+/// One line of the cart — a marketplace [product], an AI [design] or a store's [quote]. [issue]
 /// is set when it can't be bought right now ("Stok habis", "Material tidak
 /// tersedia", …) — such lines can't be selected.
 class CartLine {
@@ -78,6 +110,7 @@ class CartLine {
   final String? issue;
   final CartProduct? product;
   final CartDesign? design;
+  final CartQuote? quote;
 
   /// AI designs: the customer's optional description for the store.
   final String? notes;
@@ -92,15 +125,19 @@ class CartLine {
     this.issue,
     this.product,
     this.design,
+    this.quote,
     this.notes,
     this.unitPrice = 0,
   });
 
   bool get isDesign => design != null;
-  bool get available => issue == null && (product != null || design != null);
-  int get lineTotal => unitPrice * quantity;
+  bool get isQuote => quote != null;
+  bool get available => issue == null && (product != null || design != null || quote != null);
 
-  String get displayName => design?.name ?? product?.productName ?? 'Item tidak tersedia';
+  /// A penawaran's jasa edit is added once, on top of unit price × quantity.
+  int get lineTotal => unitPrice * quantity + (quote?.editServiceFee ?? 0);
+
+  String get displayName => quote?.name ?? design?.name ?? product?.productName ?? 'Item tidak tersedia';
 
   String? get imageUrl {
     if (design != null) return design!.previewUrl;
@@ -119,6 +156,7 @@ class CartLine {
       issue: json['Issue']?.toString(),
       product: product,
       design: json['Design'] is Map<String, dynamic> ? CartDesign.fromJson(json['Design'] as Map<String, dynamic>) : null,
+      quote: json['Quote'] is Map<String, dynamic> ? CartQuote.fromJson(json['Quote'] as Map<String, dynamic>) : null,
       notes: (json['Notes']?.toString().trim().isNotEmpty ?? false) ? json['Notes'].toString() : null,
       unitPrice: json['UnitPrice'] != null ? _asInt(json['UnitPrice']) : (product?.price ?? 0),
     );

@@ -372,6 +372,7 @@ class _JobDetailViewState extends State<JobDetailView> {
                                 // The autoscaled size is only final once the job is done.
                                 size: detail.status == AiJobStatus.succeeded ? detail.primaryModel!.sizeLabel : null,
                                 weight: detail.primaryModel!.weightLabel!,
+                                multicolor: detail.isMulticolor,
                                 totalFilament: detail.isMulticolor && detail.status == AiJobStatus.succeeded
                                     ? formatGramEstimate(detail.totalFilamentGrams)
                                     : null,
@@ -541,10 +542,17 @@ class _JobDetailViewState extends State<JobDetailView> {
 class _PrintEstimateCard extends StatelessWidget {
   final String? size;
   final String weight;
+  final bool multicolor;
   final String? totalFilament;
   final bool singleColorFallback;
 
-  const _PrintEstimateCard({required this.size, required this.weight, this.totalFilament, this.singleColorFallback = false});
+  const _PrintEstimateCard({
+    required this.size,
+    required this.weight,
+    required this.multicolor,
+    this.totalFilament,
+    this.singleColorFallback = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -569,6 +577,8 @@ class _PrintEstimateCard extends StatelessWidget {
             ),
           ],
           _EstimateRow(icon: Icons.scale_outlined, label: 'Estimasi berat barang', value: weight),
+          const SizedBox(height: 8),
+          _EstimateRow(icon: Icons.palette_outlined, label: 'Jenis warna', value: multicolor ? 'Multicolor' : 'Satu warna'),
           if (totalFilament != null) ...[
             const SizedBox(height: 8),
             _EstimateRow(icon: Icons.palette_outlined, label: 'Total filamen terpakai', value: totalFilament!),
