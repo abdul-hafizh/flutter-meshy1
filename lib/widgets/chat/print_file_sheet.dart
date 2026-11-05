@@ -45,7 +45,7 @@ class _PrintFileSheetState extends State<_PrintFileSheet> {
   List<String> _materials = [];
   String? _material;
   int _quantity = 1;
-  bool _editService = false;
+  bool _editService = true;
   String? _fileName;
   Uint8List? _bytes;
   bool _picking = false;

@@ -54,9 +54,9 @@ class CreateScreenState extends State<CreateScreen> {
   /// Set after a Generate tap with no colour type, so the section turns red.
   bool _showColorError = false;
 
-  /// Optional "Gunakan jasa edit": the store prices the edit after checkout,
+  /// "Gunakan jasa edit" (on by default; the customer may untick it): the store prices the edit after checkout,
   /// and the order can only be paid once it has.
-  bool _editService = false;
+  bool _editService = true;
 
   /// The store that will print the design — must be chosen before the
   /// prompt; the finished design then goes into the cart for this store.
@@ -261,7 +261,7 @@ class CreateScreenState extends State<CreateScreen> {
         _showDimErrors = false;
         _showColorError = false;
         _colorType = null;
-        _editService = false;
+        _editService = true;
         _pickedImages.clear();
         _pickedImageBytesList.clear();
       });

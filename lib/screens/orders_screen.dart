@@ -450,37 +450,23 @@ class OrdersScreenState extends State<OrdersScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    _StatusShortcut(
-                      icon: Icons.account_balance_wallet_outlined,
-                      label: 'Belum Bayar',
-                      count: _countFor(OrderTab.unpaid),
-                      active: false,
-                      onTap: () => _openHistory(OrderTab.unpaid),
-                    ),
-                    _StatusShortcut(
-                      icon: Icons.inventory_2_outlined,
-                      label: 'Dikemas',
-                      count: _countFor(OrderTab.packing),
-                      active: false,
-                      onTap: () => _openHistory(OrderTab.packing),
-                    ),
-                    _StatusShortcut(
-                      icon: Icons.local_shipping_outlined,
-                      label: 'Dikirim',
-                      count: _countFor(OrderTab.shipped),
-                      active: false,
-                      onTap: () => _openHistory(OrderTab.shipped),
-                    ),
-                    _StatusShortcut(
-                      icon: Icons.star_border_rounded,
-                      label: 'Beri Penilaian',
-                      count: _countFor(OrderTab.review),
-                      active: false,
-                      onTap: () => _openHistory(OrderTab.review),
-                    ),
-                  ],
+                // Every Riwayat Pesanan status, scrollable sideways; tapping one
+                // opens Riwayat Pesanan on that tab.
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final tab in OrderTab.values)
+                        _StatusShortcut(
+                          icon: _kTabIcons[tab]!,
+                          label: tab.label,
+                          // A red badge only where something needs doing.
+                          count: _kBadgedTabs.contains(tab) ? _countFor(tab) : 0,
+                          active: false,
+                          onTap: () => _openHistory(tab),
+                        ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 18),
               ],
@@ -523,7 +509,20 @@ class OrdersScreenState extends State<OrdersScreen> {
   }
 }
 
-/// One of the four Shopee-style status shortcuts (icon + label + red count
+const _kTabIcons = <OrderTab, IconData>{
+  OrderTab.unpaid: Icons.account_balance_wallet_outlined,
+  OrderTab.packing: Icons.inventory_2_outlined,
+  OrderTab.shipped: Icons.local_shipping_outlined,
+  OrderTab.completed: Icons.check_circle_outline_rounded,
+  OrderTab.returns: Icons.assignment_return_outlined,
+  OrderTab.cancelled: Icons.cancel_outlined,
+  OrderTab.review: Icons.star_border_rounded,
+};
+
+/// Statuses whose count is "to do" (Selesai, Pengembalian and Dibatalkan only grow).
+const _kBadgedTabs = {OrderTab.unpaid, OrderTab.packing, OrderTab.shipped, OrderTab.review};
+
+/// One of the Shopee-style status shortcuts (icon + label + red count
 /// badge) at the top of the physical-orders view.
 class _StatusShortcut extends StatelessWidget {
   final IconData icon;
@@ -543,7 +542,8 @@ class _StatusShortcut extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = active ? AppColors.purple : AppColors.textPrimary;
-    return Expanded(
+    return SizedBox(
+      width: 80,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: onTap,
@@ -952,9 +952,7 @@ class _OrderCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          job.weightLabel != null
-                              ? '${_formatDate(job.createdAt)} · ${job.weightLabel}'
-                              : _formatDate(job.createdAt),
+                          _formatDate(job.createdAt),
                           style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                         ),
                       ],
