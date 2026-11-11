@@ -117,6 +117,7 @@ class _JobDetailViewState extends State<JobDetailView> {
       final merchants = await MerchantService.listNearbyForMe(
         token: token,
         address: context.read<ActiveAddressController>().address,
+        scope: MerchantService.scopePrompt,
       );
       if (!mounted) return;
       setState(() => _merchants = merchants);

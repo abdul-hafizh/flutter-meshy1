@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/nearby_merchant.dart';
+import '../../services/merchant_service.dart';
 import '../../providers/auth_controller.dart';
 import '../../screens/chat/open_store_chat.dart';
 import '../../services/api_config.dart';
@@ -119,6 +120,7 @@ class StartOptionsState extends State<StartOptions> {
         builder: (_) => const StorePickerScreen(
           title: 'Pilih Toko Cetak',
           subtitle: 'Pilih toko yang akan mencetak file 3D kamu. Setelah memilih, kamu langsung masuk ke chat toko untuk mengirim file.',
+          scope: MerchantService.scopePrintFile,
         ),
       ),
     );

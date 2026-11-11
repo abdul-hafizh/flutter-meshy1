@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../models/nearby_merchant.dart';
+import '../services/merchant_service.dart';
 import '../providers/auth_controller.dart';
 import '../services/ai_job_service.dart';
 import '../services/auth_service.dart' show ApiException;
@@ -113,7 +114,7 @@ class CreateScreenState extends State<CreateScreen> {
 
   Future<void> _pickStore() async {
     final store = await Navigator.of(context).push<NearbyMerchant>(
-      MaterialPageRoute(builder: (_) => StorePickerScreen(selectedId: _store?.id)),
+      MaterialPageRoute(builder: (_) => StorePickerScreen(selectedId: _store?.id, scope: MerchantService.scopePrompt)),
     );
     if (store != null && mounted) setState(() => _store = store);
   }

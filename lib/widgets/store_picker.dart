@@ -21,7 +21,10 @@ class StorePickerScreen extends StatefulWidget {
   /// Shown above the list — what picking a store leads to.
   final String? subtitle;
 
-  const StorePickerScreen({super.key, this.selectedId, this.title = 'Pilih Toko', this.subtitle});
+  /// Only stores serving this kategori produk (MerchantService.scopePrompt / scopePrintFile).
+  final String? scope;
+
+  const StorePickerScreen({super.key, this.selectedId, this.title = 'Pilih Toko', this.subtitle, this.scope});
 
   @override
   State<StorePickerScreen> createState() => _StorePickerScreenState();
@@ -58,6 +61,7 @@ class _StorePickerScreenState extends State<StorePickerScreen> {
       final stores = await MerchantService.listNearbyForMe(
         token: token,
         address: context.read<ActiveAddressController>().address,
+        scope: widget.scope,
       );
       if (!mounted) return;
       setState(() => _stores = stores);

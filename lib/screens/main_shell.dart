@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/nearby_merchant.dart';
+import '../services/merchant_service.dart';
 import '../providers/auth_controller.dart';
 import '../providers/active_address_controller.dart';
 import '../providers/cart_controller.dart';
@@ -101,6 +102,7 @@ class _MainShellState extends State<MainShell> {
           builder: (_) => StorePickerScreen(
             title: 'Kirim File ke Toko',
             subtitle: 'Pilih toko yang akan mencetak "${file.name}". Setelah itu isi bahan & jumlah, lalu file dikirim ke chat toko.',
+            scope: MerchantService.scopePrintFile,
           ),
         ),
       );

@@ -24,6 +24,12 @@ class MerchantService {
 
   static Uri _uri(String path) => Uri.parse('${ApiConfig.baseUrl}$path');
 
+  /// Kategori produk codes a store can serve (Users.ProductScopes — the same
+  /// codes as the home cards' action). Pass one as `scope` to list only the
+  /// stores serving it.
+  static const scopePrompt = 'PROMPT';
+  static const scopePrintFile = 'PRINT_FILE';
+
   static Map<String, String> _headers(String token) => {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
@@ -39,6 +45,7 @@ class MerchantService {
     double? latitude,
     double? longitude,
     bool nearbyOnly = false,
+    String? scope,
   }) async {
     return (await listNearbyResult(
       token: token,
@@ -46,6 +53,7 @@ class MerchantService {
       latitude: latitude,
       longitude: longitude,
       nearbyOnly: nearbyOnly,
+      scope: scope,
     ))
         .stores;
   }
@@ -56,8 +64,10 @@ class MerchantService {
     double? latitude,
     double? longitude,
     bool nearbyOnly = false,
+    String? scope,
   }) async {
     final query = <String, String>{};
+    if (scope != null) query['scope'] = scope;
     if (cityId != null) query['userCityId'] = '$cityId';
     if (latitude != null && longitude != null) {
       query['latitude'] = '$latitude';
@@ -84,7 +94,7 @@ class MerchantService {
 
   /// Every store, closest to [address] (the active delivery address) first;
   /// without one, the customer's default saved address is used.
-  static Future<List<NearbyMerchant>> listNearbyForMe({required String token, UserAddress? address}) async {
+  static Future<List<NearbyMerchant>> listNearbyForMe({required String token, UserAddress? address, String? scope}) async {
     var a = address;
     if (a == null) {
       try {
@@ -94,7 +104,7 @@ class MerchantService {
         // No saved address yet — every store still comes back, just unranked.
       }
     }
-    return listNearby(token: token, cityId: a?.cityId, latitude: a?.latitude, longitude: a?.longitude);
+    return listNearby(token: token, cityId: a?.cityId, latitude: a?.latitude, longitude: a?.longitude, scope: scope);
   }
 
   /// One store as the store list shows it (photo, city, rating, grams sold).
