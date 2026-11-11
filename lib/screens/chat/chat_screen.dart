@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
@@ -8,6 +10,7 @@ import '../../services/api_config.dart';
 import '../../services/auth_service.dart' show ApiException;
 import '../../services/order_link_service.dart';
 import '../../services/order_service.dart';
+import '../../services/print_file_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/chat/link_attachment_builders.dart';
 import '../../widgets/chat/print_file_sheet.dart';
@@ -53,9 +56,17 @@ class _ChatScreenState extends State<ChatScreen> {
   late final FocusNode _focusNode = FocusNode();
   late final StreamMessageComposerController _messageComposerController = StreamMessageComposerController();
   bool _sendingOrderLink = false;
+  bool _routingPrintFile = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _messageComposerController.addListener(_routePrintFiles);
+  }
 
   @override
   void dispose() {
+    _messageComposerController.removeListener(_routePrintFiles);
     _focusNode.dispose();
     _messageComposerController.dispose();
     super.dispose();
@@ -120,6 +131,56 @@ class _ChatScreenState extends State<ChatScreen> {
     final merchantId = _counterpartId;
     if (merchantId == null) return;
     await showPrintFileSheet(context, merchantId: merchantId);
+  }
+
+  static bool _isPrintFile(Attachment a) {
+    final name = a.file?.name ?? a.title ?? '';
+    final dot = name.lastIndexOf('.');
+    return dot >= 0 && PrintFileService.allowedExtensions.contains(name.substring(dot + 1).toLowerCase());
+  }
+
+  /// A 3D file attached with the composer's own "+" picker goes through the
+  /// same "Kirim File Siap Print" form as the header's upload button (bahan,
+  /// jumlah, gambar referensi), so the seller gets the print-file card with
+  /// its order button instead of a bare file message.
+  void _routePrintFiles() {
+    if (_routingPrintFile) return;
+    final picked = _messageComposerController.attachments.where(_isPrintFile).toList();
+    if (picked.isEmpty) return;
+    _routingPrintFile = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        for (final a in picked) {
+          _messageComposerController.removeAttachmentById(a.id);
+        }
+        if (!mounted) return;
+        final merchantId = _counterpartId;
+        if (merchantId == null) return;
+        if (picked.length > 1) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Kirim file siap print satu per satu. File pertama dibuka dulu.')),
+          );
+        }
+        final file = picked.first.file;
+        final bytes = file?.bytes ?? (file?.path != null ? await File(file!.path!).readAsBytes() : null);
+        if (!mounted) return;
+        if (file == null || bytes == null) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('File tidak bisa dibaca. Coba lagi.')));
+          return;
+        }
+        if (bytes.length > PrintFileService.maxBytes) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ukuran file maksimal 50 MB.')));
+          return;
+        }
+        await showPrintFileSheet(context, merchantId: merchantId, fileName: file.name ?? 'model.stl', bytes: bytes);
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('File tidak bisa dibaca. Coba lagi.')));
+        }
+      } finally {
+        _routingPrintFile = false;
+      }
+    });
   }
 
   @override
